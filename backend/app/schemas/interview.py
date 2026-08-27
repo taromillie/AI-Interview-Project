@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field
 
 
 class InterviewCreateRequest(BaseModel):
-    position_id: int | None = None
+    position_id: int | None = None          # 题库岗位（选择题库时使用）
+    target_position: str | None = None      # 目标岗位文本（JD 选项或自定义输入时使用）
     resume_id: int | None = None
     mode: str = Field(default="text", pattern="^(text|voice|video)$")
     interview_type: str = Field(default="normal", pattern="^(normal|switch|salary)$")
@@ -17,12 +18,31 @@ class InterviewOut(BaseModel):
     id: int
     position_id: int | None = None
     position_name: str | None = None
+    target_position: str | None = None
     resume_id: int | None = None
     mode: str
     interview_type: str
     status: str
     max_rounds: int
     created_at: object | None = None
+    report_id: int | None = None
+    overall_score: float | None = None
+    message_count: int | None = None
+
+
+class InterviewMessageOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    role: str
+    content: str
+    strategy: str | None = None
+    created_at: object | None = None
+
+
+class InterviewDetailOut(InterviewOut):
+    messages: list[InterviewMessageOut] = Field(default_factory=list)
+    report: ReportOut | None = None
 
 
 class AnswerRequest(BaseModel):

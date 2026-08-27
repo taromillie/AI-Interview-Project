@@ -47,8 +47,12 @@ class InterviewAgent:
         candidates: list[str],
         asked_rounds: int,
         max_rounds: int,
+        probe_streak: int = 0,
     ) -> dict:
-        """生成下一轮决策（LLM 优先，失败走规则回退）。"""
+        """生成下一轮决策（LLM 优先，失败走规则回退）。
+
+        probe_streak：当前话题已连续追问的轮数，≥2 时 prompt 强制换话题。
+        """
         candidates_text = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(candidates[:8])) or "（暂无，可自行拟定）"
         prompt = DECISION_PROMPT.format(
             position_name=position_name,
@@ -59,6 +63,7 @@ class InterviewAgent:
             candidates=candidates_text,
             asked_rounds=asked_rounds,
             max_rounds=max_rounds,
+            probe_streak=probe_streak,
         )
         try:
             raw = await self._llm.achat(

@@ -31,6 +31,7 @@ const cards = [
   { path: '/interview', title: '模拟面试', desc: '有边界的 AI 面试官，基于回答动态追问', icon: 'Microphone', color: '#67c23a' },
   { path: '/career', title: '转行诊断', desc: '双岗位能力对比，可迁移技能图谱', icon: 'Compass', color: '#e6a23c' },
   { path: '/salary', title: '谈薪评估', desc: '薪资区间参考与谈薪话术演练', icon: 'Money', color: '#f56c6c' },
+  { path: '/profile', title: '能力画像', desc: '多场面试维度聚合，雷达图洞察短板', icon: 'TrendCharts', color: '#17a2b8' },
   { path: '/questions', title: '题库管理', desc: '知识原子维护与发布', icon: 'Collection', color: '#909399' },
   { path: '/providers', title: '模型配置', desc: '配置你的 LLM API Key（多供应商）', icon: 'Setting', color: '#7b68ee' },
 ]

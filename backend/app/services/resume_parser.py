@@ -1,8 +1,9 @@
 """简历解析服务：文本提取 + LLM 结构化抽取。
 
 - PDF 用 PyMuPDF 提取文本，支持 txt/md 等纯文本；
-- 用 LLM 抽取基本信息/教育/经历/技能（JSON），失败时降级为纯文本摘要。
+- 用 LLM 抽取基本信息/教育/经历/技能（JSON），失败或超时时降级为纯文本摘要。
 """
+import asyncio
 import json
 import logging
 
@@ -14,6 +15,8 @@ from app.llm.base import ChatMessage, LLMProvider
 logger = logging.getLogger(__name__)
 
 MAX_RESUME_SIZE = 2 * 1024 * 1024  # 2MB
+# 单次 LLM 解析最长等待时间；超时直接降级，避免保存长时间卡住
+PARSE_TIMEOUT = 45.0
 
 
 def extract_text_from_bytes(file_bytes: bytes, filename: str) -> str:
@@ -48,10 +51,13 @@ async def parse_resume(llm: LLMProvider, raw_text: str) -> dict:
         return {"structured": {}, "skills": [], "brief": ""}
 
     try:
-        raw = await llm.achat(
-            [ChatMessage("user", RESUME_PARSE_PROMPT.format(resume_text=raw_text[:6000]))],
-            temperature=0,
-            max_tokens=1200,
+        raw = await asyncio.wait_for(
+            llm.achat(
+                [ChatMessage("user", RESUME_PARSE_PROMPT.format(resume_text=raw_text[:6000]))],
+                temperature=0,
+                max_tokens=1200,
+            ),
+            timeout=PARSE_TIMEOUT,
         )
         structured = _parse_json(raw)
         skills = [
@@ -61,6 +67,9 @@ async def parse_resume(llm: LLMProvider, raw_text: str) -> dict:
         ]
         brief = build_brief(structured, raw_text)
         return {"structured": structured, "skills": skills, "brief": brief}
+    except asyncio.TimeoutError:
+        logger.warning("简历结构化解析超时（%.0fs），使用降级结果", PARSE_TIMEOUT)
+        return {"structured": {}, "skills": [], "brief": raw_text[:500]}
     except Exception as exc:  # noqa: BLE001 - 解析失败不阻断上传
         logger.warning("简历结构化解析失败，使用降级结果: %s", exc)
         return {"structured": {}, "skills": [], "brief": raw_text[:500]}

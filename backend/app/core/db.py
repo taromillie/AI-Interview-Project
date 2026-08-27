@@ -1,7 +1,7 @@
 """数据库引擎与会话管理（SQLAlchemy 2.0）。"""
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -34,8 +34,22 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _ensure_column(conn, table: str, column: str, ddl: str) -> None:
+    """SQLite 轻量迁移：表已存在时补充缺失列（create_all 不会给已有表加列）。"""
+    rows = conn.execute(text(f'PRAGMA table_info("{table}")')).fetchall()
+    cols = {r[1] for r in rows}
+    if column not in cols:
+        conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {ddl}'))
+
+
 def init_db() -> None:
     """开发阶段直接建表；生产环境建议使用 Alembic 迁移。"""
     from app import models  # noqa: F401  确保模型已注册
 
     Base.metadata.create_all(bind=engine)
+
+    if settings.DATABASE_URL.startswith("sqlite"):
+        with engine.connect() as conn:
+            _ensure_column(conn, "career_plans", "summary", "summary TEXT DEFAULT ''")
+            _ensure_column(conn, "resumes", "name", "name VARCHAR(200) NOT NULL DEFAULT ''")
+            conn.commit()

@@ -9,6 +9,11 @@ export function listInterviews() {
   return http.get('/interviews')
 }
 
+// 面试详情（完整问答流 + 复盘报告），用于历史复盘
+export function getInterviewDetail(interviewId) {
+  return http.get(`/interviews/${interviewId}`)
+}
+
 // 开始面试（SSE：preparing → question）
 export function startInterview(interviewId, { onEvent, signal } = {}) {
   return postSSE(`/interviews/${interviewId}/start`, {}, { onEvent, signal })

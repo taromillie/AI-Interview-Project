@@ -1,16 +1,18 @@
 import http from './http'
 
-// 上传简历（粘贴文本）
-export function uploadResumeText(rawText) {
+// 上传简历（粘贴文本），name 可选：留空自动命名
+export function uploadResumeText(rawText, name) {
   const form = new FormData()
   form.append('raw_text', rawText)
+  if (name) form.append('name', name)
   return http.post('/resumes/upload', form)
 }
 
-// 上传简历（PDF/TXT 文件）
-export function uploadResumeFile(file) {
+// 上传简历（PDF/TXT 文件），name 可选：留空自动命名
+export function uploadResumeFile(file, name) {
   const form = new FormData()
   form.append('file', file)
+  if (name) form.append('name', name)
   return http.post('/resumes/upload', form)
 }
 
@@ -19,18 +21,25 @@ export function listResumes() {
   return http.get('/resumes')
 }
 
-// 更新历史简历（粘贴文本）
-export function updateResume(id, rawText) {
+// 更新历史简历（粘贴文本），name 可选：留空则保留原名
+export function updateResume(id, rawText, name) {
   const form = new FormData()
   form.append('raw_text', rawText)
+  if (name) form.append('name', name)
   return http.put(`/resumes/${id}`, form)
 }
 
-// 更新历史简历（重新上传文件）
-export function updateResumeFile(id, file) {
+// 更新历史简历（重新上传文件），name 可选：留空则保留原名
+export function updateResumeFile(id, file, name) {
   const form = new FormData()
   form.append('file', file)
+  if (name) form.append('name', name)
   return http.put(`/resumes/${id}`, form)
+}
+
+// 删除历史简历（连带删除其匹配诊断记录）
+export function deleteResume(id) {
+  return http.delete(`/resumes/${id}`)
 }
 
 // 简历×JD 匹配诊断（可指定简历与历史 JD）

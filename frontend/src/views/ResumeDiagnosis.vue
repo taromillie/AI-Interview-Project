@@ -18,6 +18,14 @@
           </el-radio-group>
 
           <el-input
+            v-model="resumeName"
+            placeholder="简历名称（可选），留空自动按「姓名 · 目标岗位」命名"
+            maxlength="60"
+            clearable
+            class="mb-8"
+          />
+
+          <el-input
             v-if="inputMode === 'paste'"
             v-model="resumeText"
             type="textarea"
@@ -42,7 +50,7 @@
           </el-upload>
 
           <el-button type="primary" :loading="uploading" class="action" @click="saveResume">
-            {{ editingId ? '保存修改' : '保存简历' }}
+            {{ uploading ? '正在解析并保存简历…' : (editingId ? '保存修改' : '保存简历') }}
           </el-button>
 
           <template v-if="resumes.length">
@@ -73,13 +81,16 @@
               >
                 <div class="history-main">
                   <div class="history-title">
-                    {{ formatTime(r.created_at) }} · {{ r.skills.length }} 项技能
+                    {{ r.name || '未命名简历' }}
                     <el-tag v-if="selectedResumeId === r.id" type="success" size="small" class="selected-tag">
                       诊断中
                     </el-tag>
                     <el-tag v-if="editingId === r.id" type="warning" size="small" class="selected-tag">
                       编辑中
                     </el-tag>
+                  </div>
+                  <div class="history-meta">
+                    保存于 {{ formatTime(r.created_at) }} · {{ r.skills.length }} 项技能
                   </div>
                   <div class="history-skills">
                     <el-tag v-for="s in r.skills.slice(0, 4)" :key="s" size="small" class="skill-tag">
@@ -92,6 +103,7 @@
                   用于诊断
                 </el-button>
                 <el-button size="small" @click="loadResume(r)">编辑</el-button>
+                <el-button size="small" type="danger" plain @click="confirmDeleteResume(r)">删除</el-button>
               </div>
             </div>
           </template>
@@ -229,6 +241,7 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import {
   createJd,
   deleteJd,
+  deleteResume,
   diagnose,
   listJds,
   listResumes,
@@ -240,6 +253,7 @@ import {
 } from '@/api/diagnostic'
 
 const inputMode = ref('paste')
+const resumeName = ref('')
 const resumeText = ref('')
 const file = ref(null)
 const jdTitle = ref('')
@@ -281,7 +295,8 @@ function loadResume(r) {
   editingId.value = r.id
   inputMode.value = 'paste'
   resumeText.value = r.raw_text || ''
-  ElMessage.info(`已加载历史简历（${r.skills.length} 项技能），修改后点击「保存修改」`)
+  resumeName.value = r.name || ''
+  ElMessage.info(`已加载「${r.name || '该份'}简历」（${r.skills.length} 项技能），修改后点击「保存修改」`)
 }
 
 function loadJd(j) {
@@ -372,24 +387,53 @@ async function saveResume() {
 
   uploading.value = true
   try {
+    const customName = resumeName.value.trim()
     let r
     if (editingId.value) {
       r =
         inputMode.value === 'paste'
-          ? await updateResume(editingId.value, resumeText.value)
-          : await updateResumeFile(editingId.value, file.value)
-      ElMessage.success(`简历已更新，识别到 ${r.skills.length} 项技能`)
+          ? await updateResume(editingId.value, resumeText.value, customName)
+          : await updateResumeFile(editingId.value, file.value, customName)
+      ElMessage.success(`简历「${r.name}」已更新，识别到 ${r.skills.length} 项技能`)
       editingId.value = null
     } else {
       r =
         inputMode.value === 'paste'
-          ? await uploadResumeText(resumeText.value)
-          : await uploadResumeFile(file.value)
-      ElMessage.success(`简历已保存，识别到 ${r.skills.length} 项技能`)
+          ? await uploadResumeText(resumeText.value, customName)
+          : await uploadResumeFile(file.value, customName)
+      ElMessage.success(`简历「${r.name}」已保存，识别到 ${r.skills.length} 项技能`)
     }
+    resumeName.value = ''
     await loadResumes()
   } finally {
     uploading.value = false
+  }
+}
+
+async function confirmDeleteResume(r) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除简历「${r.name || '未命名简历'}」吗？该简历的诊断记录也会一并删除，操作不可恢复。`,
+      '删除简历',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteResume(r.id)
+    ElMessage.success('简历已删除')
+    if (selectedResumeId.value === r.id) selectedResumeId.value = null
+    if (editingId.value === r.id) {
+      editingId.value = null
+      inputMode.value = 'paste'
+      resumeText.value = ''
+      resumeName.value = ''
+      file.value = null
+    }
+    await loadResumes()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || e.message || '删除失败')
   }
 }
 
@@ -414,7 +458,7 @@ async function runDiagnose() {
 const usedResumeLabel = computed(() => {
   if (!selectedResumeId.value) return '最近一份简历'
   const r = resumes.value.find((x) => x.id === selectedResumeId.value)
-  return r ? `${formatTime(r.created_at)} 的简历` : `简历 #${selectedResumeId.value}`
+  return r ? (r.name || `简历 #${r.id}`) : `简历 #${selectedResumeId.value}`
 })
 
 const usedJdLabel = computed(() => {
@@ -542,6 +586,11 @@ onMounted(() => {
 }
 .selected-tag {
   margin-left: 6px;
+}
+.history-meta {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
 }
 .history-hint {
   font-size: 12px;

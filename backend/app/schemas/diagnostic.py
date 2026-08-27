@@ -26,6 +26,7 @@ class ResumeOut(BaseModel):
     model_config = {"from_attributes": True}
 
     id: int
+    name: str = ""
     skills: list[str]
     raw_text: str | None = None
     created_at: object | None = None

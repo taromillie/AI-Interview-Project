@@ -25,6 +25,18 @@ logger = logging.getLogger(__name__)
 
 VALID_STATUS = {"created", "asking", "finishing", "reported"}
 
+# 视为"追问当前话题"的策略：命中这些策略且连续出现即表示在死磕一个点
+PROBE_STRATEGIES = {"deep_dive", "probe", "project_probe"}
+# 同一方向允许的最大连续追问轮数，超过后强制切换话题
+MAX_PROBE_STREAK = 3
+
+# 面试结束语（口语化、有温度，随机取一个）
+FAREWELL_VARIANTS = [
+    "好的，今天关于{position}的面试就到这儿。很感谢你刚才这些回答，聊得挺深入，也让我看到了你对这个方向的理解。我先把咱们的对话整理成一份复盘报告——里面有你的亮点，也有可以再打磨的地方，稍等片刻。",
+    "行，今天关于{position}的问题就问到这里。谢谢你的坦诚分享，整个过程收获不小。我花一两分钟把这次面试整理成复盘报告，包括做得好的和可以改进的，马上就好。",
+    "好，咱们今天的面试就到此结束。感谢你认真回答每一个问题，聊下来能感觉到你有自己的积累。接下来我会生成一份复盘报告，帮你把这次表现梳理清楚，稍等一下。",
+]
+
 
 class InterviewOrchestrator:
     """一次面试会话的编排器。"""
@@ -67,6 +79,18 @@ class InterviewOrchestrator:
         """已问过的面试官问题数（assistant 消息）。"""
         return sum(1 for m in self._messages() if m.role == "assistant")
 
+    def _probe_streak(self) -> int:
+        """当前话题连续追问轮数：从最近的 assistant 消息向前数连续追问策略。"""
+        streak = 0
+        for m in reversed(self._messages()):
+            if m.role != "assistant":
+                continue
+            if m.strategy in PROBE_STRATEGIES:
+                streak += 1
+            else:
+                break
+        return streak
+
     def _history_text(self, limit: int = 6) -> str:
         lines = [
             f"{'面试官' if m.role == 'assistant' else '候选人'}：{m.content}"
@@ -84,7 +108,16 @@ class InterviewOrchestrator:
         return self.position.skills if self.position else []
 
     def _position_name(self) -> str:
+        # 优先使用自定义/JD 目标岗位；其次题库岗位；最后通用兜底
+        target = (self.interview.config or {}).get("target_position")
+        if target:
+            return str(target)
         return self.position.name if self.position else "通用岗位"
+
+    def _farewell_text(self) -> str:
+        import random
+
+        return random.choice(FAREWELL_VARIANTS).format(position=self._position_name())
 
     # ---------- 状态机动作 ----------
 
@@ -138,6 +171,7 @@ class InterviewOrchestrator:
         )
         candidate_texts = [c.question for c in candidates]
 
+        probe_streak = self._probe_streak()
         decision = await self.agent.decide_next(
             position_name=self._position_name(),
             position_skills=self._position_skills(),
@@ -147,7 +181,17 @@ class InterviewOrchestrator:
             candidates=candidate_texts,
             asked_rounds=asked_rounds,
             max_rounds=self.interview.max_rounds,
+            probe_streak=probe_streak,
         )
+
+        # 强制兜底：同一方向已连续追问超过上限，必须切换话题，不再死磕
+        if decision.get("strategy") in PROBE_STRATEGIES and probe_streak >= MAX_PROBE_STREAK:
+            decision["strategy"] = "switch_topic"
+            if candidate_texts:
+                decision["question"] = candidate_texts[0]
+                decision["reason"] = "连续追问超过上限，强制切换到未覆盖的新方向"
+            else:
+                decision["reason"] = "连续追问超过上限，改为开放式换题"
 
         if decision.get("action") == "finish" or asked_rounds >= self.interview.max_rounds:
             self.db.commit()
@@ -193,6 +237,10 @@ class InterviewOrchestrator:
             logger.warning("LLM 报告生成失败，使用规则降级: %s", exc)
             data = fallback_report(messages)
 
+        # 面试官结束语：在报告生成之后保存，避免被报告当作候选问题分析
+        farewell = self._farewell_text()
+        self._save_message("assistant", farewell, "farewell")
+
         report = Report(
             interview_id=self.interview.id,
             overall_score=data.get("overall_score", 0.0),
@@ -211,5 +259,6 @@ class InterviewOrchestrator:
             "data": {
                 "message": data.get("summary") or "面试结束，复盘报告已生成。",
                 "report_id": report.id,
+                "farewell": farewell,
             },
         }

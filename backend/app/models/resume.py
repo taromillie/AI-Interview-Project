@@ -12,6 +12,7 @@ class Resume(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")  # 用户自定义名称（空则前端用自动名）
     file_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     parsed_json: Mapped[dict] = mapped_column(JSON, default=dict)  # 结构化画像
