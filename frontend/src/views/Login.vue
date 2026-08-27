@@ -33,6 +33,9 @@
             <el-form-item>
               <el-input v-model="registerForm.password" type="password" placeholder="密码（至少 6 位）" show-password :prefix-icon="Lock" />
             </el-form-item>
+            <el-form-item>
+              <el-input v-model="registerForm.confirmPassword" type="password" placeholder="确认密码" show-password :prefix-icon="Lock" />
+            </el-form-item>
             <el-button type="primary" class="submit" :loading="loading" @click="onRegister">
               注册并登录
             </el-button>
@@ -57,7 +60,7 @@ const userStore = useUserStore()
 const tab = ref('login')
 const loading = ref(false)
 const loginForm = reactive({ username: '', password: '' })
-const registerForm = reactive({ username: '', email: '', password: '' })
+const registerForm = reactive({ username: '', email: '', password: '', confirmPassword: '' })
 
 async function onLogin() {
   if (!loginForm.username || !loginForm.password) {
@@ -81,9 +84,18 @@ async function onRegister() {
     ElMessage.warning('用户名必填，密码至少 6 位')
     return
   }
+  if (registerForm.password !== registerForm.confirmPassword) {
+    ElMessage.warning('两次输入的密码不一致')
+    return
+  }
   loading.value = true
   try {
-    const data = await http.post('/auth/register', registerForm)
+    const payload = {
+      username: registerForm.username,
+      password: registerForm.password,
+      email: registerForm.email || undefined,
+    }
+    const data = await http.post('/auth/register', payload)
     userStore.setToken(data.access_token)
     const me = await http.get('/auth/me')
     userStore.setProfile(me)

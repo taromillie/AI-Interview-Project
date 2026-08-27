@@ -1,0 +1,108 @@
+"""面试官 Agent：决策下一步动作并生成问题（Phase 1 文字面试）。
+
+核心方法 decide_next 输出结构化决策：
+    {"action": "ask_question"|"finish", "strategy": ..., "question": ..., "reason": ...}
+LLM 失败时自动回退到规则决策，保证面试流程不中断。
+"""
+import json
+import logging
+from typing import Any
+
+from app.agents.prompts import DECISION_PROMPT, OPENING_QUESTION
+from app.llm.base import ChatMessage, LLMProvider
+
+logger = logging.getLogger(__name__)
+
+STRATEGIES = {"deep_dive", "probe", "remedy", "switch_topic", "project_probe", "none"}
+
+
+def _extract_json(raw: str) -> Any:
+    """从 LLM 输出中提取 JSON（容忍代码块包裹与前后杂质）。"""
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        text = text[start : end + 1]
+    return json.loads(text)
+
+
+class InterviewAgent:
+    """封装面试官决策逻辑。"""
+
+    def __init__(self, llm: LLMProvider):
+        self._llm = llm
+
+    async def decide_next(
+        self,
+        *,
+        position_name: str,
+        position_skills: list[str],
+        resume_brief: str,
+        history_text: str,
+        latest_answer: str,
+        candidates: list[str],
+        asked_rounds: int,
+        max_rounds: int,
+    ) -> dict:
+        """生成下一轮决策（LLM 优先，失败走规则回退）。"""
+        candidates_text = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(candidates[:8])) or "（暂无，可自行拟定）"
+        prompt = DECISION_PROMPT.format(
+            position_name=position_name,
+            position_skills="、".join(position_skills[:12]) or "（未提供）",
+            resume_brief=(resume_brief or "")[:800],
+            history=history_text or "（无）",
+            latest_answer=(latest_answer or "")[:600],
+            candidates=candidates_text,
+            asked_rounds=asked_rounds,
+            max_rounds=max_rounds,
+        )
+        try:
+            raw = await self._llm.achat(
+                [ChatMessage("user", prompt)],
+                temperature=0,
+                max_tokens=800,
+            )
+            decision = _extract_json(raw)
+            if not self._validate(decision):
+                raise ValueError("decision 字段不合法")
+            return decision
+        except Exception as exc:  # noqa: BLE001 - 兜底保证流程不中断
+            logger.warning("LLM 决策失败，使用规则回退: %s", exc)
+            return self.fallback_decision(candidates, asked_rounds, max_rounds)
+
+    def _validate(self, d: dict) -> bool:
+        if not isinstance(d, dict):
+            return False
+        if d.get("action") not in ("ask_question", "finish"):
+            return False
+        if d.get("strategy") not in STRATEGIES:
+            d["strategy"] = "none"
+        if d.get("action") == "ask_question" and not (d.get("question") or "").strip():
+            return False
+        return True
+
+    def fallback_decision(
+        self,
+        candidates: list[str],
+        asked_rounds: int,
+        max_rounds: int,
+    ) -> dict:
+        """规则回退：按题库顺序出题，耗尽或到上限则结束。"""
+        if asked_rounds >= max_rounds:
+            return {"action": "finish", "strategy": "none", "question": "", "reason": "达到轮次上限"}
+        if candidates:
+            return {
+                "action": "ask_question",
+                "strategy": "none",
+                "question": candidates[0],
+                "reason": "规则回退：按题库顺序出题",
+            }
+        return {"action": "finish", "strategy": "none", "question": "", "reason": "题库已耗尽"}
+
+    async def opening(self, position_name: str) -> str:
+        """生成开场问题（固定开场白，保证稳定）。"""
+        return OPENING_QUESTION.format(position_name=position_name)

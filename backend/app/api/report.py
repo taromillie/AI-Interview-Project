@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
-from app.models.interview import Report
+from app.models.interview import Interview, Report
 from app.models.user import User
 from app.schemas.interview import ReportOut
 
@@ -19,5 +19,8 @@ def get_report(
 ):
     report = db.get(Report, report_id)
     if report is None:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    interview = db.get(Interview, report.interview_id)
+    if interview is None or interview.user_id != user.id:
         raise HTTPException(status_code=404, detail="报告不存在")
     return report

@@ -35,9 +35,15 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# 日志
+# 日志与临时产物
 logs/
 *.log
+*.err
+*.out
+
+# Word / Office 临时锁文件
+~$*
+*.tmp
 
 # CodeBuddy 项目数据（勿提交）
 .codebuddy/

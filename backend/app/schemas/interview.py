@@ -15,10 +15,14 @@ class InterviewOut(BaseModel):
     model_config = {"from_attributes": True}
 
     id: int
+    position_id: int | None = None
+    position_name: str | None = None
+    resume_id: int | None = None
     mode: str
     interview_type: str
     status: str
     max_rounds: int
+    created_at: object | None = None
 
 
 class AnswerRequest(BaseModel):

@@ -1,6 +1,7 @@
 """安全工具：密码哈希、JWT、AES-GCM 密钥加密。"""
 import base64
 import hashlib
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -49,7 +50,7 @@ def _aes_key() -> bytes:
 
 
 def encrypt_api_key(plain: str) -> str:
-    nonce = AESGCM(_aes_key()).generate_nonce()
+    nonce = os.urandom(12)
     ciphertext = AESGCM(_aes_key()).encrypt(nonce, plain.encode("utf-8"), None)
     return base64.b64encode(nonce + ciphertext).decode("utf-8")
 

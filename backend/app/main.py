@@ -41,12 +41,13 @@ def health() -> dict:
 
 
 # 路由注册
-from app.api import auth, career, interview, provider, question, report, resume, salary  # noqa: E402
+from app.api import auth, career, interview, jd, provider, question, report, resume, salary  # noqa: E402
 
 for router in (
     auth.router,
     provider.router,
     resume.router,
+    jd.router,
     interview.router,
     report.router,
     career.router,

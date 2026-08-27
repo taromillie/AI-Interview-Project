@@ -19,6 +19,17 @@ class Resume(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class JobDescription(Base):
+    """用户保存的岗位 JD 历史。"""
+    __tablename__ = "job_descriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class MatchDiagnostic(Base):
     __tablename__ = "match_diagnostics"
 

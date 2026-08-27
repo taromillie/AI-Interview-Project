@@ -2,7 +2,7 @@
 from app.models.career import AbilityProfile, CareerPlan, SalaryEval
 from app.models.interview import Interview, InterviewMessage, Report
 from app.models.position import KnowledgeAtom, Position
-from app.models.resume import MatchDiagnostic, Resume
+from app.models.resume import JobDescription, MatchDiagnostic, Resume
 from app.models.user import LlmProvider, User
 
 __all__ = [
@@ -11,6 +11,7 @@ __all__ = [
     "Position",
     "KnowledgeAtom",
     "Resume",
+    "JobDescription",
     "MatchDiagnostic",
     "Interview",
     "InterviewMessage",

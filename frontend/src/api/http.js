@@ -19,12 +19,23 @@ http.interceptors.response.use(
   (resp) => resp.data,
   (error) => {
     const status = error.response?.status
-    const detail = error.response?.data?.detail || error.response?.data?.message || '请求失败'
+    const data = error.response?.data
+    let msg = '请求失败'
+    if (data?.detail) {
+      // FastAPI 验证错误 [{"loc":..., "msg":...}]
+      if (Array.isArray(data.detail)) {
+        msg = data.detail.map((d) => d.msg).join('；') || msg
+      } else {
+        msg = data.detail
+      }
+    } else if (data?.message) {
+      msg = data.message
+    }
     if (status === 401) {
       localStorage.removeItem('token')
       router.push({ name: 'login' })
     }
-    ElMessage.error(typeof detail === 'string' ? detail : '请求失败')
+    ElMessage.error(msg)
     return Promise.reject(error)
   },
 )
