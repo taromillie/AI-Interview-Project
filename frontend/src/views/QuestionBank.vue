@@ -18,7 +18,7 @@
           <el-option label="已归档" value="archived" />
         </el-select>
         <el-alert
-          title="仅「已发布」题目会进入模拟面试的追问链路（发布需要管理员权限）。"
+          title="已发布 = 公共题库（全员可见，进入面试追问链路）；草稿 = 仅自己可见的私有题。发布需要管理员权限。"
           type="info"
           :closable="false"
           class="tip"
@@ -41,10 +41,28 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column label="状态" width="120">
           <template #default="{ row }">
             <el-tag size="small" :type="STATUS_TYPE[row.status] || 'info'">
               {{ STATUS_TEXT[row.status] || row.status }}
+            </el-tag>
+            <el-tag
+              v-if="row.status === 'published'"
+              size="small"
+              type="warning"
+              effect="plain"
+              class="tag"
+            >
+              公共
+            </el-tag>
+            <el-tag
+              v-else-if="row.status === 'draft'"
+              size="small"
+              type="info"
+              effect="plain"
+              class="tag"
+            >
+              私有
             </el-tag>
           </template>
         </el-table-column>

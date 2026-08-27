@@ -13,6 +13,7 @@ class CareerDiagnosisOut(BaseModel):
     transferable: list[dict] = Field(default_factory=list)   # [{skill, evidence}]
     gaps: list[dict] = Field(default_factory=list)          # [{skill, level}]
     roadmap: list[dict] = Field(default_factory=list)       # 学习路径
+    transition_projects: list[dict] = Field(default_factory=list)  # [{name, description, duration}]
     summary: str = ""
 
 
@@ -27,6 +28,7 @@ class CareerPlanOut(BaseModel):
     transferable: list[dict] = Field(default_factory=list)
     gaps: list[dict] = Field(default_factory=list)
     roadmap: list[dict] = Field(default_factory=list)
+    transition_projects: list[dict] = Field(default_factory=list)
     summary: str = ""
     created_at: object | None = None
 

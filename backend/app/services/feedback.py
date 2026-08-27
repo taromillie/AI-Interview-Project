@@ -24,6 +24,13 @@ REPORT_PROMPT = """你是资深面试官兼职业顾问，请对下面这场模�
     {{"question": "题目", "answer": "候选回答(截断100字)", "score": 0到100, "comment": "点评"}}
   ],
   "weak_points": ["弱点1", "弱点2", ...],
+  "coverage": {{
+    "covered": ["已考察且表现较好的知识点"],
+    "uncovered": ["岗位要求但本次未覆盖/表现薄弱的知识点"]
+  }},
+  "learning_path": [
+    {{"phase": "阶段名称", "action": "具体学习行动", "duration": "预计时长"}}
+  ],
   "summary": "100字以内的整体评价与改进建议"
 }}
 
@@ -40,7 +47,10 @@ REPORT_PROMPT = """你是资深面试官兼职业顾问，请对下面这场模�
 【面试记录】
 {transcript}
 
-只输出 JSON 对象，不要输出任何其他文字。
+规则：
+1. coverage 基于岗位技能清单判断：covered 为已考察且回答达标的技能，uncovered 为岗位要求但未考察或表现薄弱的技能；
+2. learning_path 3-5 个阶段，针对 weak_points 与 uncovered 给出可执行的学习路线；
+3. 只输出 JSON 对象，不要输出任何其他文字。
 """
 
 
@@ -119,13 +129,41 @@ async def generate_report(
     weak_points = [str(w) for w in (data.get("weak_points") or []) if str(w).strip()][:6]
     overall = sum(dimensions.values()) / len(dimensions) if dimensions else 0.0
 
+    # 知识覆盖统计（FR-G-04）
+    cov = data.get("coverage") or {}
+    covered = [str(c)[:100] for c in (cov.get("covered") or []) if str(c).strip()][:12]
+    uncovered = [str(u)[:100] for u in (cov.get("uncovered") or []) if str(u).strip()][:12]
+    # 学习路线（FR-G-05）
+    learning_path = []
+    for item in data.get("learning_path", []) or []:
+        if isinstance(item, dict) and str(item.get("phase") or "").strip():
+            learning_path.append({
+                "phase": str(item.get("phase"))[:60],
+                "action": str(item.get("action"))[:200],
+                "duration": str(item.get("duration") or "")[:30],
+            })
+    if not learning_path:
+        learning_path = _rule_learning_path(position_skills, weak_points)
+
     return {
         "overall_score": round(_clamp(data.get("overall_score", overall)), 1),
         "dimensions": dimensions,
         "question_feedback": qf,
         "weak_points": weak_points,
+        "coverage": {"covered": covered, "uncovered": uncovered},
+        "learning_path": learning_path,
         "summary": str(data.get("summary") or "")[:200],
     }
+
+
+def _rule_learning_path(position_skills: list[str], weak_points: list[str]) -> list[dict]:
+    """规则兜底：基于岗位技能与弱点生成学习路线。"""
+    target = position_skills[:3] if position_skills else ["岗位核心技能"]
+    return [
+        {"phase": "基础夯实", "action": f"系统复习「{'、'.join(target)}」，补齐知识盲区", "duration": "1 周"},
+        {"phase": "实战演练", "action": f"针对{'、'.join(weak_points[:2]) or '薄弱点'}做专项练习与项目复盘", "duration": "1-2 周"},
+        {"phase": "面试冲刺", "action": "每天 1 场模拟面试，复盘表达与逻辑，沉淀高频问题回答模板", "duration": "1 周"},
+    ]
 
 
 def fallback_report(messages: list[InterviewMessage]) -> dict:
@@ -137,6 +175,8 @@ def fallback_report(messages: list[InterviewMessage]) -> dict:
             "dimensions": {"tech": 0, "expression": 0, "logic": 0, "project": 0},
             "question_feedback": [],
             "weak_points": ["面试未产生有效作答"],
+            "coverage": {"covered": [], "uncovered": []},
+            "learning_path": [],
             "summary": "本次面试未产生有效回答，请重新开始一场模拟面试。",
         }
     avg_len = sum(len(m.content) for m in user_msgs) / len(user_msgs)
@@ -166,5 +206,7 @@ def fallback_report(messages: list[InterviewMessage]) -> dict:
         },
         "question_feedback": qf,
         "weak_points": ["回答颗粒度不足，建议补充量化指标"],
+        "coverage": {"covered": [], "uncovered": []},
+        "learning_path": _rule_learning_path([], ["回答颗粒度不足"]),
         "summary": "本次复盘由规则引擎生成（LLM 调用失败），建议补充细节后重新评估。",
     }

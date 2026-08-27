@@ -33,6 +33,7 @@ class CareerPlan(Base):
     transferable: Mapped[list] = mapped_column(JSON, default=list)   # [{skill, evidence}]
     gaps: Mapped[list] = mapped_column(JSON, default=list)          # [{skill, level}]
     roadmap: Mapped[list] = mapped_column(JSON, default=list)       # 学习路径
+    transition_projects: Mapped[list] = mapped_column(JSON, default=list)  # [{name, description, duration}]
     summary: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

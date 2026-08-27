@@ -47,6 +47,18 @@
           <el-icon><TrendCharts /></el-icon>
           <span>能力画像</span>
         </el-menu-item>
+        <el-menu-item index="/study-plan">
+          <el-icon><Calendar /></el-icon>
+          <span>备战日历</span>
+        </el-menu-item>
+        <el-menu-item index="/real-interview">
+          <el-icon><EditPen /></el-icon>
+          <span>真实面试复盘</span>
+        </el-menu-item>
+        <el-menu-item index="/offer">
+          <el-icon><Trophy /></el-icon>
+          <span>Offer 对比</span>
+        </el-menu-item>
         <el-menu-item index="/questions">
           <el-icon><Collection /></el-icon>
           <span>题库管理</span>
@@ -106,6 +118,9 @@ const titles = {
   '/career': '转行诊断',
   '/salary': '谈薪评估',
   '/profile': '能力画像',
+  '/study-plan': '备战日历',
+  '/real-interview': '真实面试复盘',
+  '/offer': 'Offer 对比',
   '/questions': '题库管理',
   '/providers': '模型配置',
 }

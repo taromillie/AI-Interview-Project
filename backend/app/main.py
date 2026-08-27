@@ -41,7 +41,21 @@ def health() -> dict:
 
 
 # 路由注册
-from app.api import auth, career, interview, jd, profile, provider, question, report, resume, salary  # noqa: E402
+from app.api import (  # noqa: E402
+    auth,
+    career,
+    interview,
+    jd,
+    offer,
+    profile,
+    provider,
+    question,
+    real_interview,
+    report,
+    resume,
+    salary,
+    study_plan,
+)
 
 for router in (
     auth.router,
@@ -54,5 +68,8 @@ for router in (
     career.router,
     salary.router,
     question.router,
+    study_plan.router,
+    real_interview.router,
+    offer.router,
 ):
     app.include_router(router, prefix="/api")

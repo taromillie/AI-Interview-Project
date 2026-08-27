@@ -59,6 +59,66 @@
           </el-tag>
         </template>
 
+        <!-- 知识覆盖统计 -->
+        <template v-if="report.coverage">
+          <el-divider content-position="left">知识覆盖统计</el-divider>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <div class="cov-block covered">
+                <div class="cov-title">
+                  <el-icon><CircleCheckFilled /></el-icon>
+                  已覆盖且表现较好（{{ report.coverage.covered?.length || 0 }}）
+                </div>
+                <el-tag
+                  v-for="(c, i) in report.coverage.covered || []"
+                  :key="i"
+                  type="success"
+                  effect="plain"
+                  class="cov-tag"
+                >
+                  {{ c }}
+                </el-tag>
+                <el-empty v-if="!(report.coverage.covered || []).length" description="暂无" :image-size="40" />
+              </div>
+            </el-col>
+            <el-col :span="12">
+              <div class="cov-block uncovered">
+                <div class="cov-title">
+                  <el-icon><WarningFilled /></el-icon>
+                  未覆盖 / 薄弱（{{ report.coverage.uncovered?.length || 0 }}）
+                </div>
+                <el-tag
+                  v-for="(u, i) in report.coverage.uncovered || []"
+                  :key="i"
+                  type="danger"
+                  effect="plain"
+                  class="cov-tag"
+                >
+                  {{ u }}
+                </el-tag>
+                <el-empty v-if="!(report.coverage.uncovered || []).length" description="暂无" :image-size="40" />
+              </div>
+            </el-col>
+          </el-row>
+        </template>
+
+        <!-- 学习路线推荐 -->
+        <template v-if="report.learning_path?.length">
+          <el-divider content-position="left">个性化学习路线</el-divider>
+          <el-steps :active="report.learning_path.length" align-center finish-status="success" class="lp-steps">
+            <el-step
+              v-for="(lp, i) in report.learning_path"
+              :key="i"
+              :title="lp.phase"
+              :description="lp.duration"
+            />
+          </el-steps>
+          <div v-for="(lp, i) in report.learning_path" :key="i" class="lp-item">
+            <span class="lp-phase">【{{ lp.phase }}】{{ lp.duration }}</span>
+            <span class="lp-action">{{ lp.action }}</span>
+          </div>
+        </template>
+
         <!-- 逐题反馈 -->
         <el-divider content-position="left">逐题批改（{{ report.question_feedback?.length || 0 }}）</el-divider>
         <el-collapse v-if="report.question_feedback?.length">
@@ -149,6 +209,46 @@ onMounted(load)
 }
 .weak-tag {
   margin: 0 8px 8px 0;
+}
+.cov-block {
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-height: 80px;
+}
+.cov-block.covered {
+  background: #f0f9eb;
+  border: 1px solid #e1f3d8;
+}
+.cov-block.uncovered {
+  background: #fef0f0;
+  border: 1px solid #fde2e2;
+}
+.cov-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: #303133;
+}
+.cov-tag {
+  margin: 0 8px 8px 0;
+}
+.lp-steps {
+  margin-bottom: 18px;
+}
+.lp-item {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #606266;
+}
+.lp-phase {
+  font-weight: 700;
+  color: #303133;
+  white-space: nowrap;
 }
 .qf-title {
   flex: 1;

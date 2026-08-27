@@ -104,6 +104,27 @@
               </el-timeline-item>
             </el-timeline>
             <el-empty v-else description="暂无学习路径" :image-size="50" />
+
+            <template v-if="result.transition_projects?.length">
+              <div class="section-title">过渡项目推荐（{{ result.transition_projects.length }}）</div>
+              <el-alert
+                title="以下项目可直接写进简历，用于证明目标岗位技能，弥补经历空白。"
+                type="warning"
+                :closable="false"
+                class="proj-tip"
+              />
+              <div
+                v-for="(pr, i) in result.transition_projects"
+                :key="i"
+                class="project-card"
+              >
+                <div class="project-head">
+                  <span class="project-name">{{ pr.name }}</span>
+                  <el-tag size="small" effect="plain">{{ pr.duration }}</el-tag>
+                </div>
+                <div class="project-desc">{{ pr.description }}</div>
+              </div>
+            </template>
           </template>
 
           <el-empty
@@ -286,5 +307,32 @@ onMounted(() => {
   font-size: 13px;
   color: #606266;
   margin-top: 2px;
+}
+.proj-tip {
+  margin-bottom: 10px;
+}
+.project-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #f8f9fb;
+}
+.project-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.project-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+.project-desc {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.7;
 }
 </style>

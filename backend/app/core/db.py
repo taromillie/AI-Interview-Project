@@ -51,5 +51,6 @@ def init_db() -> None:
     if settings.DATABASE_URL.startswith("sqlite"):
         with engine.connect() as conn:
             _ensure_column(conn, "career_plans", "summary", "summary TEXT DEFAULT ''")
+            _ensure_column(conn, "career_plans", "transition_projects", "transition_projects JSON")
             _ensure_column(conn, "resumes", "name", "name VARCHAR(200) NOT NULL DEFAULT ''")
             conn.commit()

@@ -32,7 +32,10 @@ const cards = [
   { path: '/career', title: '转行诊断', desc: '双岗位能力对比，可迁移技能图谱', icon: 'Compass', color: '#e6a23c' },
   { path: '/salary', title: '谈薪评估', desc: '薪资区间参考与谈薪话术演练', icon: 'Money', color: '#f56c6c' },
   { path: '/profile', title: '能力画像', desc: '多场面试维度聚合，雷达图洞察短板', icon: 'TrendCharts', color: '#17a2b8' },
-  { path: '/questions', title: '题库管理', desc: '知识原子维护与发布', icon: 'Collection', color: '#909399' },
+  { path: '/study-plan', title: '备战日历', desc: 'AI 依据能力缺口生成冲刺计划，逐日打卡', icon: 'Calendar', color: '#8e44ad' },
+  { path: '/real-interview', title: '真实面试复盘', desc: '录入真实面试问答，AI 逐题批改提分', icon: 'EditPen', color: '#e84393' },
+  { path: '/offer', title: 'Offer 对比', desc: '多 Offer 总包计算与 AI 综合建议', icon: 'Trophy', color: '#00b894' },
+  { path: '/questions', title: '题库管理', desc: '公共题库 + 私有草稿，知识原子维护与发布', icon: 'Collection', color: '#909399' },
   { path: '/providers', title: '模型配置', desc: '配置你的 LLM API Key（多供应商）', icon: 'Setting', color: '#7b68ee' },
 ]
 

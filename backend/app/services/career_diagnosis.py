@@ -61,6 +61,18 @@ def _rule_fallback(from_position: str, to_position: str, skills: list[str]) -> d
         {"stage": "项目实战", "action": "完成 2-3 个对标岗位的实战项目并沉淀到简历", "duration": "2-3 个月"},
         {"stage": "求职准备", "action": "更新简历并参与模拟面试打磨表达", "duration": "1 个月"},
     ]
+    transition_projects = [
+        {
+            "name": f"「{to_position}」入门实战项目",
+            "description": f"基于现有基础搭建一个使用 {'、'.join(gap_skills[:3])} 的完整小项目，形成可量化的简历条目",
+            "duration": "2-4 周",
+        },
+        {
+            "name": "开源贡献 / 竞赛项目",
+            "description": "参与目标技术栈的开源项目或编程竞赛，产出可公开的代码仓库与文档",
+            "duration": "4-6 周",
+        },
+    ]
     return {
         "transferable": [
             {"skill": "学习能力", "evidence": "已有跨领域学习经验，可快速掌握新技能栈"},
@@ -68,6 +80,7 @@ def _rule_fallback(from_position: str, to_position: str, skills: list[str]) -> d
         ],
         "gaps": gaps,
         "roadmap": roadmap,
+        "transition_projects": transition_projects,
         "summary": f"从「{from_position}」转型「{to_position}」具备一定基础，建议按路线图补齐技能缺口后切入。",
     }
 
@@ -107,6 +120,7 @@ async def run_career_diagnosis(
         transferable = clean_list("transferable", ("skill", "evidence"))
         gaps = clean_list("gaps", ("skill", "level", "suggestion"))
         roadmap = clean_list("roadmap", ("stage", "action", "duration"))
+        transition_projects = clean_list("transition_projects", ("name", "description", "duration"))
         summary = str(data.get("summary") or "")[:200]
         if not gaps and not roadmap:
             raise ValueError("LLM 输出为空结构")
@@ -115,6 +129,7 @@ async def run_career_diagnosis(
         fallback = _rule_fallback(from_position, to_position, skills)
         transferable, gaps = fallback["transferable"], fallback["gaps"]
         roadmap, summary = fallback["roadmap"], fallback["summary"]
+        transition_projects = fallback.get("transition_projects", [])
 
     plan = CareerPlan(
         user_id=user_id,
@@ -123,6 +138,7 @@ async def run_career_diagnosis(
         transferable=transferable,
         gaps=gaps,
         roadmap=roadmap,
+        transition_projects=transition_projects,
         summary=summary,
     )
     db.add(plan)

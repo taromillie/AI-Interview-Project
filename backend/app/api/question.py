@@ -1,6 +1,6 @@
 """题库管理接口（知识原子 CRUD，ADMIN 发布）。"""
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin
@@ -18,11 +18,31 @@ def list_atoms(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """题库列表：管理员可见全部；普通用户仅可见已发布公共题 + 本人草稿。"""
     stmt = select(KnowledgeAtom)
     if position_id:
         stmt = stmt.where(KnowledgeAtom.position_id == position_id)
-    if status:
-        stmt = stmt.where(KnowledgeAtom.status == status)
+    if user.role == "admin":
+        if status:
+            stmt = stmt.where(KnowledgeAtom.status == status)
+        return db.scalars(stmt).all()
+    if status == "draft":
+        stmt = stmt.where(
+            KnowledgeAtom.status == "draft",
+            KnowledgeAtom.created_by == user.id,
+        )
+    elif status == "archived":
+        stmt = stmt.where(
+            KnowledgeAtom.status == "archived",
+            KnowledgeAtom.created_by == user.id,
+        )
+    else:
+        stmt = stmt.where(
+            or_(
+                KnowledgeAtom.status == "published",
+                and_(KnowledgeAtom.status == "draft", KnowledgeAtom.created_by == user.id),
+            )
+        )
     return db.scalars(stmt).all()
 
 
