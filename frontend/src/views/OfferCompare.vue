@@ -13,27 +13,7 @@
     </div>
 
     <!-- 向导步骤条 -->
-    <div class="wizard">
-      <template v-for="(s, i) in wizardSteps" :key="s.id">
-        <button
-          class="w-step"
-          :class="{ active: currentStep === s.id, done: maxStep > s.id }"
-          :disabled="s.id > maxStep && s.id !== currentStep + 1"
-          @click="goStep(s.id)"
-        >
-          <span class="w-dot">
-            <el-icon v-if="maxStep > s.id" :size="14"><Check /></el-icon>
-            <template v-else>{{ s.id }}</template>
-          </span>
-          <span class="w-label">{{ s.title }}</span>
-        </button>
-        <span
-          v-if="i < wizardSteps.length - 1"
-          class="w-line"
-          :class="{ done: maxStep > wizardSteps[i].id }"
-        ></span>
-      </template>
-    </div>
+    <WizardStepper :steps="wizardSteps" :current-step="currentStep" :max-step="maxStep" @step="goStep" />
 
     <!-- 步骤内容 -->
     <div class="w-body">
@@ -230,6 +210,7 @@ import {
   deleteOffer,
   listOffers,
 } from '@/api/offer'
+import WizardStepper from '@/components/wizard/WizardStepper.vue'
 
 const commonCities = ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', '苏州', '西安']
 

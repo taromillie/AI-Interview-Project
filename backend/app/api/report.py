@@ -1,14 +1,52 @@
 """复盘报告接口。"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.interview import Interview, Report
+from app.workers.report import generate_report_task
 from app.models.user import User
 from app.schemas.interview import ReportOut
 
 router = APIRouter(prefix="/reports", tags=["复盘报告"])
+
+
+@router.post("/interviews/{interview_id}/generate", status_code=202)
+def enqueue_report(
+    interview_id: int,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """提交后台报告任务，立即返回可轮询的处理中状态。"""
+    interview = db.get(Interview, interview_id)
+    if interview is None or interview.user_id != user.id:
+        raise HTTPException(status_code=404, detail="面试不存在")
+    if db.query(Report).filter(Report.interview_id == interview_id).first():
+        return {"status": "reported", "interview_id": interview_id}
+    interview.status = "finishing"
+    db.commit()
+    background_tasks.add_task(generate_report_task, interview_id)
+    return {"status": "processing", "interview_id": interview_id}
+
+
+@router.get("/interviews/{interview_id}/status")
+def report_status(
+    interview_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """返回报告生成状态，供前端轮询。"""
+    interview = db.get(Interview, interview_id)
+    if interview is None or interview.user_id != user.id:
+        raise HTTPException(status_code=404, detail="面试不存在")
+    report = db.query(Report).filter(Report.interview_id == interview_id).first()
+    return {
+        "status": "reported" if report else ("processing" if interview.status == "finishing" else interview.status),
+        "interview_id": interview_id,
+        "report_id": report.id if report else None,
+    }
 
 
 @router.get("/{report_id}", response_model=ReportOut)

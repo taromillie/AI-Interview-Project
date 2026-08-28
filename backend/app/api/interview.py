@@ -10,7 +10,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -30,8 +30,10 @@ from app.schemas.interview import (
 )
 from app.services.interview_orchestrator import InterviewOrchestrator
 from app.services.llm_utils import require_llm
+from app.repositories import InterviewRepository
 
 router = APIRouter(prefix="/interviews", tags=["模拟面试"])
+repository = InterviewRepository()
 
 
 def _own_interview(db: Session, user: User, interview_id: int) -> Interview:
@@ -51,11 +53,7 @@ def _make_out(db: Session, interview: Interview) -> InterviewOut:
         iv = db.get(Interviewer, interview.interviewer_id)
         interviewer_name = iv.name if iv else None
     report = db.scalar(select(Report).where(Report.interview_id == interview.id))
-    message_count = db.scalar(
-        select(func.count())
-        .select_from(InterviewMessage)
-        .where(InterviewMessage.interview_id == interview.id)
-    )
+    message_count = repository.message_count(db, interview.id)
     return InterviewOut(
         id=interview.id,
         position_id=interview.position_id,
@@ -221,12 +219,7 @@ def list_interviews(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    rows = db.scalars(
-        select(Interview)
-        .where(Interview.user_id == user.id)
-        .order_by(Interview.id.desc())
-        .limit(50)
-    ).all()
+    rows = repository.list_by_user(db, user.id)
     return [_make_out(db, i) for i in rows]
 
 
@@ -238,12 +231,8 @@ def interview_detail(
 ):
     """面试详情：完整问答流 + 复盘报告（用于历史复盘）。"""
     interview = _own_interview(db, user, interview_id)
-    messages = db.scalars(
-        select(InterviewMessage)
-        .where(InterviewMessage.interview_id == interview.id)
-        .order_by(InterviewMessage.id)
-    ).all()
-    report = db.scalar(select(Report).where(Report.interview_id == interview.id))
+    messages = repository.messages(db, interview.id)
+    report = repository.report(db, interview.id)
     base = _make_out(db, interview)
     return InterviewDetailOut(
         **base.model_dump(),

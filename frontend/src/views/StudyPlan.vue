@@ -257,6 +257,7 @@ import {
 } from '@element-plus/icons-vue'
 import { listResumes } from '@/api/diagnostic'
 import { formatDateTime } from '@/utils/time'
+import WizardStepper from '@/components/wizard/WizardStepper.vue'
 import {
   deleteStudyPlan,
   generateStudyPlan,

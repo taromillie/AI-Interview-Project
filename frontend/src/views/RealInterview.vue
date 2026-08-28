@@ -7,27 +7,7 @@
 
     <!-- ============ 向导式录入 ============ -->
     <template v-if="!current">
-      <div class="wizard">
-        <template v-for="(s, i) in wizardSteps" :key="s.id">
-          <button
-            class="w-step"
-            :class="{ active: currentStep === s.id, done: maxStep > s.id }"
-            :disabled="s.id > maxStep && s.id !== currentStep + 1"
-            @click="goStep(s.id)"
-          >
-            <span class="w-dot">
-              <el-icon v-if="maxStep > s.id" :size="14"><Check /></el-icon>
-              <template v-else>{{ s.id }}</template>
-            </span>
-            <span class="w-label">{{ s.title }}</span>
-          </button>
-          <span
-            v-if="i < wizardSteps.length - 1"
-            class="w-line"
-            :class="{ done: maxStep > wizardSteps[i].id }"
-          ></span>
-        </template>
-      </div>
+      <WizardStepper :steps="wizardSteps" :current-step="currentStep" :max-step="maxStep" @step="goStep" />
 
       <div class="w-body">
         <transition name="wizard" mode="out-in">
@@ -342,6 +322,7 @@ import {
   listRealInterviews,
   reviewRealInterview,
 } from '@/api/realInterview'
+import WizardStepper from '@/components/wizard/WizardStepper.vue'
 
 const roundTypes = ['技术面', '业务面', 'HR 面', '交叉面', '终面']
 

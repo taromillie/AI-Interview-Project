@@ -7,27 +7,7 @@
 
     <!-- ============ 向导式输入 ============ -->
     <template v-if="!result">
-      <div class="wizard">
-        <template v-for="(s, i) in wizardSteps" :key="s.id">
-          <button
-            class="w-step"
-            :class="{ active: currentStep === s.id, done: maxStep > s.id }"
-            :disabled="s.id > maxStep && s.id !== currentStep + 1"
-            @click="goStep(s.id)"
-          >
-            <span class="w-dot">
-              <el-icon v-if="maxStep > s.id" :size="14"><Check /></el-icon>
-              <template v-else>{{ s.id }}</template>
-            </span>
-            <span class="w-label">{{ s.title }}</span>
-          </button>
-          <span
-            v-if="i < wizardSteps.length - 1"
-            class="w-line"
-            :class="{ done: maxStep > wizardSteps[i].id }"
-          ></span>
-        </template>
-      </div>
+      <WizardStepper :steps="wizardSteps" :current-step="currentStep" :max-step="maxStep" @step="goStep" />
 
       <div class="w-body">
         <transition name="wizard" mode="out-in">
@@ -271,6 +251,7 @@ import {
 import { listResumes } from '@/api/diagnostic'
 import { listSalaryEvals, salaryEvaluate } from '@/api/salary'
 import { formatDateTime } from '@/utils/time'
+import WizardStepper from '@/components/wizard/WizardStepper.vue'
 
 const wizardSteps = [
   { id: 1, title: '岗位城市' },
