@@ -15,6 +15,7 @@ from app.agents.interview_agent import InterviewAgent
 from app.core.exceptions import AppError
 from app.llm.base import LLMProvider
 from app.models.interview import Interview, InterviewMessage, Report
+from app.models.interviewer import Interviewer
 from app.models.position import Position
 from app.models.resume import Resume
 from app.models.user import User
@@ -46,13 +47,20 @@ class InterviewOrchestrator:
         self.user = user
         self.interview = interview
         self.llm = llm
-        self.agent = InterviewAgent(llm)
         self.position: Position | None = None
         self.resume: Resume | None = None
         if interview.position_id:
             self.position = db.get(Position, interview.position_id)
         if interview.resume_id:
             self.resume = db.get(Resume, interview.resume_id)
+        # v1.1：加载面试官角色与难度，注入 Agent 人设
+        interviewer = db.get(Interviewer, interview.interviewer_id) if interview.interviewer_id else None
+        self.agent = InterviewAgent(
+            llm,
+            persona=interviewer.persona if interviewer else "",
+            style=interviewer.style if interviewer else "",
+            difficulty=interview.difficulty or "normal",
+        )
 
     # ---------- 内部工具 ----------
 

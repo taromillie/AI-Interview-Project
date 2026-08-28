@@ -1,18 +1,23 @@
 <template>
-  <el-card>
-    <template #header>
-      <span>模型配置（LLM Provider）</span>
-      <el-tag v-if="active && active.configured" type="success" class="active-tag">
-        {{ active.provider_name }} · {{ active.model }}
-      </el-tag>
-    </template>
-
-    <el-alert
-      title="API Key 加密存储，仅用于调用大模型。支持 DeepSeek / Kimi / GLM / Qwen / OpenAI 等兼容接口。"
-      type="info"
-      :closable="false"
-      class="tip"
-    />
+  <div class="provider-page">
+    <div class="page-banner">
+      <div class="banner-left">
+        <div class="banner-icon">
+          <el-icon :size="24"><Setting /></el-icon>
+        </div>
+        <div>
+          <div class="banner-title">模型配置</div>
+          <div class="banner-desc">API Key 加密存储，仅用于调用大模型。支持 DeepSeek / Kimi / GLM / Qwen / OpenAI 等兼容接口。</div>
+        </div>
+      </div>
+    </div>
+    <el-card>
+      <template #header>
+        <span>模型配置（LLM Provider）</span>
+        <el-tag v-if="active && active.configured" type="success" class="active-tag">
+          {{ active.provider_name }} · {{ active.model }}
+        </el-tag>
+      </template>
 
     <el-form :model="form" label-width="100px" class="form">
       <el-form-item label="供应商">
@@ -38,10 +43,12 @@
         <el-button type="primary" :loading="saving" @click="save">保存并设为当前</el-button>
       </el-form-item>
     </el-form>
-  </el-card>
+    </el-card>
+  </div>
 </template>
 
 <script setup>
+import { Setting } from '@element-plus/icons-vue'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
@@ -119,9 +126,6 @@ onMounted(() => {
   margin-left: 12px;
 }
 
-.tip {
-  margin-bottom: 20px;
-}
 
 .form {
   max-width: 560px;

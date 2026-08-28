@@ -6,6 +6,8 @@ class InterviewCreateRequest(BaseModel):
     position_id: int | None = None          # 题库岗位（选择题库时使用）
     target_position: str | None = None      # 目标岗位文本（JD 选项或自定义输入时使用）
     resume_id: int | None = None
+    interviewer_id: int | None = None       # 面试官角色（v1.1，默认用通用技术面）
+    difficulty: str = Field(default="normal", pattern="^(easy|normal|hard)$")  # 面试难度档位
     mode: str = Field(default="text", pattern="^(text|voice|video)$")
     interview_type: str = Field(default="normal", pattern="^(normal|switch|salary)$")
     max_rounds: int = Field(default=6, ge=1, le=20)
@@ -20,6 +22,9 @@ class InterviewOut(BaseModel):
     position_name: str | None = None
     target_position: str | None = None
     resume_id: int | None = None
+    interviewer_id: int | None = None
+    interviewer_name: str | None = None
+    difficulty: str | None = None
     mode: str
     interview_type: str
     status: str

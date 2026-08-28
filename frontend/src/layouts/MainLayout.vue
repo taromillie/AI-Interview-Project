@@ -1,80 +1,92 @@
 <template>
   <el-container class="layout">
-    <el-aside width="224px" class="aside">
-      <div class="logo">
+    <el-aside :width="collapsed ? '64px' : '208px'" class="aside">
+      <div class="logo" @click="collapsed = !collapsed">
         <div class="logo-badge">
           <el-icon :size="19"><MagicStick /></el-icon>
         </div>
-        <div>
-          <div class="logo-name">AI 模拟面试官</div>
+        <div v-show="!collapsed" class="logo-text">
+          <div class="logo-name">AI 面试官</div>
           <div class="logo-sub">Interview Coach</div>
         </div>
       </div>
 
       <el-menu
         :default-active="$route.path"
+        :collapse="collapsed"
+        :collapse-transition="false"
         router
-        background-color="transparent"
-        text-color="#94a3b8"
-        active-text-color="#ffffff"
         class="side-menu"
       >
         <el-menu-item index="/">
           <el-icon><HomeFilled /></el-icon>
-          <span>工作台</span>
+          <template #title>工作台</template>
+        </el-menu-item>
+
+        <div v-show="!collapsed" class="menu-group">面试实战</div>
+        <el-menu-item index="/jobs">
+          <el-icon><Grid /></el-icon>
+          <template #title>岗位广场</template>
         </el-menu-item>
         <el-menu-item index="/diagnosis">
           <el-icon><Document /></el-icon>
-          <span>简历 × JD 诊断</span>
+          <template #title>简历 × JD 诊断</template>
         </el-menu-item>
         <el-menu-item index="/interview">
           <el-icon><Microphone /></el-icon>
-          <span>模拟面试</span>
-        </el-menu-item>
-        <el-menu-item index="/history">
-          <el-icon><Tickets /></el-icon>
-          <span>面试记录</span>
-        </el-menu-item>
-        <el-menu-item index="/career">
-          <el-icon><Compass /></el-icon>
-          <span>转行诊断</span>
-        </el-menu-item>
-        <el-menu-item index="/salary">
-          <el-icon><Money /></el-icon>
-          <span>谈薪评估</span>
-        </el-menu-item>
-        <el-menu-item index="/profile">
-          <el-icon><TrendCharts /></el-icon>
-          <span>能力画像</span>
-        </el-menu-item>
-        <el-menu-item index="/study-plan">
-          <el-icon><Calendar /></el-icon>
-          <span>备战日历</span>
+          <template #title>模拟面试</template>
         </el-menu-item>
         <el-menu-item index="/real-interview">
           <el-icon><EditPen /></el-icon>
-          <span>真实面试复盘</span>
+          <template #title>真实面试复盘</template>
+        </el-menu-item>
+        <el-menu-item index="/history">
+          <el-icon><Tickets /></el-icon>
+          <template #title>面试记录</template>
+        </el-menu-item>
+
+        <div v-show="!collapsed" class="menu-group">职业决策</div>
+        <el-menu-item index="/career">
+          <el-icon><Compass /></el-icon>
+          <template #title>转行诊断</template>
+        </el-menu-item>
+        <el-menu-item index="/salary">
+          <el-icon><Money /></el-icon>
+          <template #title>谈薪评估</template>
         </el-menu-item>
         <el-menu-item index="/offer">
           <el-icon><Trophy /></el-icon>
-          <span>Offer 对比</span>
+          <template #title>Offer 对比</template>
         </el-menu-item>
+        <el-menu-item index="/profile">
+          <el-icon><TrendCharts /></el-icon>
+          <template #title>能力画像</template>
+        </el-menu-item>
+        <el-menu-item index="/study-plan">
+          <el-icon><Calendar /></el-icon>
+          <template #title>备战日历</template>
+        </el-menu-item>
+
+        <div v-show="!collapsed" class="menu-group">系统设置</div>
         <el-menu-item index="/questions">
           <el-icon><Collection /></el-icon>
-          <span>题库管理</span>
+          <template #title>题库管理</template>
         </el-menu-item>
         <el-menu-item index="/providers">
           <el-icon><Setting /></el-icon>
-          <span>模型配置</span>
+          <template #title>模型配置</template>
         </el-menu-item>
       </el-menu>
 
-      <div class="aside-foot">AI Interview Coach v1.0</div>
+      <div class="aside-foot" v-show="!collapsed">AI Interview Coach v1.1</div>
     </el-aside>
 
     <el-container class="body">
       <el-header class="header">
         <div class="header-left">
+          <button class="fold-btn" @click="collapsed = !collapsed" title="收起/展开导航">
+            <el-icon :size="18"><Expand v-if="collapsed" /><Fold v-else /></el-icon>
+          </button>
           <div class="header-title">{{ currentTitle }}</div>
         </div>
         <el-dropdown @command="onCommand">
@@ -102,16 +114,38 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import {
+  ArrowDown,
+  Calendar,
+  Collection,
+  Compass,
+  Document,
+  EditPen,
+  Expand,
+  Fold,
+  Grid,
+  HomeFilled,
+  MagicStick,
+  Microphone,
+  Money,
+  Setting,
+  SwitchButton,
+  Tickets,
+  TrendCharts,
+  Trophy,
+} from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const collapsed = ref(false)
 
 const titles = {
   '/': '工作台',
+  '/jobs': '岗位广场',
   '/diagnosis': '简历 × JD 智能匹配诊断',
   '/interview': '模拟面试',
   '/history': '面试记录',
@@ -140,75 +174,95 @@ function onCommand(cmd) {
   height: 100vh;
 }
 
-/* ---------- 侧边栏 ---------- */
+/* ---------- 侧边栏（弱化：浅色、窄栏、可折叠） ---------- */
 .aside {
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #0b1220 0%, #111c33 60%, #171337 100%);
+  background: #ffffff;
+  border-right: 1px solid #eef1f6;
   overflow: hidden;
+  transition: width 0.28s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 .logo {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 20px 18px 18px;
+  gap: 10px;
+  padding: 18px 14px 14px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 .logo-badge {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 11px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 .logo-name {
-  color: #fff;
-  font-size: 15px;
+  color: #0f172a;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.3px;
   line-height: 1.2;
 }
 .logo-sub {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.42);
-  letter-spacing: 0.8px;
+  color: #94a3b8;
+  letter-spacing: 0.6px;
   margin-top: 2px;
 }
 
 .side-menu {
   flex: 1;
   border-right: none;
-  padding: 6px 10px;
+  padding: 2px 8px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.side-menu :deep(.el-menu) {
+  border-right: none;
+}
+.menu-group {
+  padding: 14px 10px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #a5b0c2;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .side-menu :deep(.el-menu-item) {
-  height: 44px;
-  line-height: 44px;
+  height: 42px;
+  line-height: 42px;
   border-radius: 10px;
-  margin-bottom: 3px;
-  font-size: 14px;
+  margin-bottom: 2px;
+  font-size: 13px;
+  color: #64748b;
   transition: background 0.2s, color 0.2s;
 }
 .side-menu :deep(.el-menu-item:hover) {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
+  background: #f1f5f9;
+  color: #0f172a;
 }
 .side-menu :deep(.el-menu-item.is-active) {
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.95) 0%, rgba(99, 102, 241, 0.8) 100%);
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-weight: 600;
 }
 .side-menu :deep(.el-menu-item .el-icon) {
-  font-size: 17px;
+  font-size: 16px;
 }
 .aside-foot {
-  padding: 14px 20px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 16px;
+  font-size: 10px;
+  color: #b6c0d0;
+  border-top: 1px solid #f1f4f9;
   letter-spacing: 0.4px;
+  white-space: nowrap;
 }
 
 /* ---------- 主体 ---------- */
@@ -219,14 +273,39 @@ function onCommand(cmd) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 62px;
-  padding: 0 24px;
-  background: rgba(255, 255, 255, 0.92);
+  height: 60px;
+  padding: 0 20px;
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid #e8edf5;
+  border-bottom: 1px solid #eef1f6;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fold-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.fold-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.fold-btn:active {
+  transform: scale(0.94);
 }
 .header-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #0f172a;
   letter-spacing: 0.2px;

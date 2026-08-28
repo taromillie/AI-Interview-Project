@@ -45,6 +45,7 @@
         </div>
 
         <div class="tab-switch">
+          <div class="tab-pill" :class="{ right: tab === 'register' }"></div>
           <button type="button" class="tab-btn" :class="{ active: tab === 'login' }" @click="tab = 'login'">
             登录
           </button>
@@ -347,6 +348,7 @@ async function onRegister() {
   color: #64748b;
 }
 .tab-switch {
+  position: relative;
   display: flex;
   gap: 4px;
   background: #eef2f7;
@@ -354,7 +356,24 @@ async function onRegister() {
   padding: 4px;
   margin-bottom: 24px;
 }
+.tab-pill {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: calc(50% - 4px);
+  background: #fff;
+  border-radius: 9px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+  transition: transform 0.25s var(--ease-smooth-out);
+  z-index: 0;
+}
+.tab-pill.right {
+  transform: translateX(100%);
+}
 .tab-btn {
+  position: relative;
+  z-index: 1;
   flex: 1;
   height: 38px;
   border: none;
@@ -364,18 +383,23 @@ async function onRegister() {
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 160ms var(--ease-out), background-color 0.2s ease, color 0.2s ease;
+}
+.tab-btn:active {
+  transform: scale(0.96);
 }
 .tab-btn.active {
-  background: #fff;
+  background: transparent;
   color: #2563eb;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
 }
 .panel-inner :deep(.el-input__wrapper) {
   border-radius: 12px;
   padding: 2px 14px;
   box-shadow: 0 0 0 1px #e2e8f0 inset;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s ease;
+}
+.panel-inner :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #2563eb inset, 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 .panel-inner :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1.5px #2563eb inset, 0 0 0 4px rgba(37, 99, 235, 0.1);
@@ -395,9 +419,14 @@ async function onRegister() {
   border: none;
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
 }
-.submit-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.42);
+.submit-btn:active {
+  transform: scale(0.98);
+}
+@media (hover: hover) and (pointer: fine) {
+  .submit-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.42);
+  }
 }
 
 /* ---------- 响应式 ---------- */

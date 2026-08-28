@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Any
 
-from app.agents.prompts import DECISION_PROMPT, OPENING_QUESTION
+from app.agents.prompts import DECISION_PROMPT, OPENING_QUESTION, build_interviewer_sections
 from app.llm.base import ChatMessage, LLMProvider
 
 logger = logging.getLogger(__name__)
@@ -31,10 +31,24 @@ def _extract_json(raw: str) -> Any:
 
 
 class InterviewAgent:
-    """封装面试官决策逻辑。"""
+    """封装面试官决策逻辑。
 
-    def __init__(self, llm: LLMProvider):
+    persona/style/difficulty：面试官角色与难度档位（v1.1），
+    未配置时为空/默认值，保持原有通用人设与标准难度。
+    """
+
+    def __init__(
+        self,
+        llm: LLMProvider,
+        persona: str = "",
+        style: str = "",
+        difficulty: str = "normal",
+    ):
         self._llm = llm
+        self._persona = persona
+        self._style = style
+        self._difficulty = difficulty
+        self._interviewer_sections = build_interviewer_sections(persona, style, difficulty)
 
     async def decide_next(
         self,
@@ -56,6 +70,7 @@ class InterviewAgent:
         candidates_text = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(candidates[:8])) or "（暂无，可自行拟定）"
         prompt = DECISION_PROMPT.format(
             position_name=position_name,
+            interviewer_sections=self._interviewer_sections or "（按通用面试官人设与标准难度进行）",
             position_skills="、".join(position_skills[:12]) or "（未提供）",
             resume_brief=(resume_brief or "")[:800],
             history=history_text or "（无）",
@@ -109,5 +124,9 @@ class InterviewAgent:
         return {"action": "finish", "strategy": "none", "question": "", "reason": "题库已耗尽"}
 
     async def opening(self, position_name: str) -> str:
-        """生成开场问题（固定开场白，保证稳定）。"""
-        return OPENING_QUESTION.format(position_name=position_name)
+        """生成开场问题（固定开场白 + 可选角色开场白，保证稳定）。"""
+        base = OPENING_QUESTION.format(position_name=position_name)
+        if self._persona and self._difficulty == "hard":
+            # 困难档 + 有角色设定：在开场追加一句角色化的开场白
+            return f"{base}\n\n（本场为高难度面试，问题会更有挑战性，请做好准备。）"
+        return base

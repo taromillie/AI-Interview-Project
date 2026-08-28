@@ -17,6 +17,7 @@ from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.core.exceptions import AppError
 from app.models.interview import Interview, InterviewMessage, Report
+from app.models.interviewer import Interviewer
 from app.models.position import Position
 from app.models.user import User
 from app.schemas.interview import (
@@ -44,6 +45,10 @@ def _make_out(db: Session, interview: Interview) -> InterviewOut:
     if interview.position_id:
         pos = db.get(Position, interview.position_id)
         position_name = pos.name if pos else None
+    interviewer_name = None
+    if interview.interviewer_id:
+        iv = db.get(Interviewer, interview.interviewer_id)
+        interviewer_name = iv.name if iv else None
     report = db.scalar(select(Report).where(Report.interview_id == interview.id))
     message_count = db.scalar(
         select(func.count())
@@ -56,6 +61,9 @@ def _make_out(db: Session, interview: Interview) -> InterviewOut:
         position_name=position_name,
         target_position=(interview.config or {}).get("target_position"),
         resume_id=interview.resume_id,
+        interviewer_id=interview.interviewer_id,
+        interviewer_name=interviewer_name,
+        difficulty=interview.difficulty,
         mode=interview.mode,
         interview_type=interview.interview_type,
         status=interview.status,
@@ -81,10 +89,24 @@ def create_interview(
     if payload.target_position:
         # 自定义/JD 岗位名存入 config，供面试官作为岗位上下文
         payload.config = {**(payload.config or {}), "target_position": payload.target_position.strip()[:80]}
+    # 面试官角色：未指定时按面试模式自动选择匹配的内置角色
+    interviewer_id = payload.interviewer_id
+    if interviewer_id is not None and db.get(Interviewer, interviewer_id) is None:
+        raise HTTPException(404, "所选面试官不存在")
+    if interviewer_id is None:
+        default = db.scalars(
+            select(Interviewer).where(
+                Interviewer.is_public == True,  # noqa: E712
+                (Interviewer.interview_type == "all") | (Interviewer.interview_type == payload.interview_type),
+            ).order_by(Interviewer.id).limit(1)
+        ).first()
+        interviewer_id = default.id if default else None
     interview = Interview(
         user_id=user.id,
         position_id=payload.position_id,
         resume_id=payload.resume_id,
+        interviewer_id=interviewer_id,
+        difficulty=payload.difficulty,
         mode=payload.mode,
         interview_type=payload.interview_type,
         max_rounds=payload.max_rounds,

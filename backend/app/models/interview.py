@@ -14,6 +14,8 @@ class Interview(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     position_id: Mapped[int | None] = mapped_column(ForeignKey("positions.id"), nullable=True)
     resume_id: Mapped[int | None] = mapped_column(ForeignKey("resumes.id"), nullable=True)
+    interviewer_id: Mapped[int | None] = mapped_column(ForeignKey("interviewers.id"), nullable=True)
+    difficulty: Mapped[str] = mapped_column(String(10), default="normal")  # easy/normal/hard
     mode: Mapped[str] = mapped_column(String(10), default="text")    # text / voice / video
     interview_type: Mapped[str] = mapped_column(String(20), default="normal")  # normal/switch/salary
     status: Mapped[str] = mapped_column(String(20), default="created")

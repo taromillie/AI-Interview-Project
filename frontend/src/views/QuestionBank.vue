@@ -1,5 +1,16 @@
 <template>
   <div class="question-bank">
+    <div class="page-banner">
+      <div class="banner-left">
+        <div class="banner-icon">
+          <el-icon :size="24"><Collection /></el-icon>
+        </div>
+        <div>
+          <div class="banner-title">题库管理</div>
+          <div class="banner-desc">已发布 = 公共题库（全员可见，进入面试追问链路）；草稿 = 仅自己可见的私有题。发布需要管理员权限。</div>
+        </div>
+      </div>
+    </div>
     <el-card>
       <template #header>
         <div class="header">
@@ -17,12 +28,6 @@
           <el-option label="已发布" value="published" />
           <el-option label="已归档" value="archived" />
         </el-select>
-        <el-alert
-          title="已发布 = 公共题库（全员可见，进入面试追问链路）；草稿 = 仅自己可见的私有题。发布需要管理员权限。"
-          type="info"
-          :closable="false"
-          class="tip"
-        />
       </div>
 
       <el-table :data="atoms" v-loading="loading" size="small">
@@ -110,6 +115,7 @@
 </template>
 
 <script setup>
+import { Collection } from '@element-plus/icons-vue'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createAtom, listAtoms, listPositions, publishAtom } from '@/api/question'
@@ -215,10 +221,6 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 14px;
   flex-wrap: wrap;
-}
-.tip {
-  flex: 1;
-  min-width: 280px;
 }
 .tag {
   margin-right: 4px;

@@ -1,11 +1,16 @@
 <template>
   <div class="profile">
-    <el-alert
-      title="能力画像由你最近多场模拟面试的复盘报告聚合生成：四维度雷达图 + 技能评分 + 优势与提升建议 + 维度趋势。完成面试并生成报告后自动更新。"
-      type="info"
-      :closable="false"
-      class="tip"
-    />
+    <div class="page-banner">
+      <div class="banner-left">
+        <div class="banner-icon">
+          <el-icon :size="24"><TrendCharts /></el-icon>
+        </div>
+        <div>
+          <div class="banner-title">能力画像</div>
+          <div class="banner-desc">由你最近多场模拟面试的复盘报告聚合生成：四维度雷达图 + 技能评分 + 优势与提升建议 + 维度趋势。完成面试并生成报告后自动更新。</div>
+        </div>
+      </div>
+    </div>
 
     <el-card>
       <template #header>
@@ -241,6 +246,7 @@
 </template>
 
 <script setup>
+import { TrendCharts } from '@element-plus/icons-vue'
 import { computed, onMounted, ref } from 'vue'
 import { getProfile } from '@/api/profile'
 
@@ -327,9 +333,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.tip {
-  margin-bottom: 16px;
-}
 .header-row {
   display: flex;
   align-items: center;

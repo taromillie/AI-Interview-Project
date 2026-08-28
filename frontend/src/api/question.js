@@ -4,6 +4,18 @@ export function listPositions() {
   return http.get('/questions/positions')
 }
 
+export function syncPositions() {
+  return http.post('/questions/positions/sync')
+}
+
+export function getSyncConfig() {
+  return http.get('/questions/positions/sync-config')
+}
+
+export function updateSyncConfig(params = {}) {
+  return http.post('/questions/positions/sync-config', null, { params })
+}
+
 export function listAtoms(params = {}) {
   return http.get('/questions', { params })
 }

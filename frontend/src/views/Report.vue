@@ -1,12 +1,23 @@
 <template>
   <div class="report-page">
-    <el-card v-loading="loading">
-      <template #header>
-        <div class="header">
-          <span>面试复盘报告</span>
-          <el-button size="small" @click="router.push({ name: 'interview' })">再来一场面试</el-button>
+    <div class="page-banner">
+      <div class="banner-left">
+        <div class="banner-icon">
+          <el-icon :size="24"><DataAnalysis /></el-icon>
         </div>
-      </template>
+        <div>
+          <div class="banner-title">面试复盘报告</div>
+          <div class="banner-desc">四维度评分、逐题批改与提升建议，让每一场面试都沉淀为下一次的底气。</div>
+        </div>
+      </div>
+      <div class="banner-actions">
+        <el-button type="primary" @click="router.push({ name: 'interview' })">
+          <el-icon style="margin-right: 4px"><Plus /></el-icon>
+          再来一场面试
+        </el-button>
+      </div>
+    </div>
+    <el-card v-loading="loading">
 
       <el-empty v-if="!loading && !report" description="暂无报告。完成一场模拟面试后，将在此展示复盘结果。" />
 
@@ -141,6 +152,7 @@
 </template>
 
 <script setup>
+import { DataAnalysis, Plus } from '@element-plus/icons-vue'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getReport } from '@/api/report'

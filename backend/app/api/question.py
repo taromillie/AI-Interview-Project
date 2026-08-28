@@ -10,6 +10,111 @@ from app.models.user import User
 
 router = APIRouter(prefix="/questions", tags=["题库管理"])
 
+# 内置岗位库（is_public=True，ADMIN 可维护；首次访问时自动初始化）
+BUILTIN_POSITIONS = [
+    {
+        "name": "后端开发工程师",
+        "direction": "backend",
+        "difficulty": "mid",
+        "skills": ["Python", "Java", "MySQL", "Redis", "消息队列", "分布式"],
+    },
+    {
+        "name": "Java 开发工程师",
+        "direction": "backend",
+        "difficulty": "mid",
+        "skills": ["Java", "Spring Boot", "MyBatis", "MySQL", "JVM", "微服务"],
+    },
+    {
+        "name": "全栈开发工程师",
+        "direction": "backend",
+        "difficulty": "senior",
+        "skills": ["Vue", "React", "Node.js", "Go", "系统设计", "Docker"],
+    },
+    {
+        "name": "测试开发工程师",
+        "direction": "backend",
+        "difficulty": "junior",
+        "skills": ["pytest", "接口测试", "自动化测试", "Selenium", "Linux"],
+    },
+    {
+        "name": "前端开发工程师",
+        "direction": "frontend",
+        "difficulty": "mid",
+        "skills": ["HTML/CSS", "JavaScript", "TypeScript", "Vue", "工程化", "性能优化"],
+    },
+    {
+        "name": "前端架构工程师",
+        "direction": "frontend",
+        "difficulty": "senior",
+        "skills": ["React", "架构设计", "微前端", "Node.js", "性能优化", "工程化"],
+    },
+    {
+        "name": "算法工程师",
+        "direction": "algorithm",
+        "difficulty": "senior",
+        "skills": ["机器学习", "深度学习", "Python", "PyTorch", "数据结构", "数学基础"],
+    },
+    {
+        "name": "推荐算法工程师",
+        "direction": "algorithm",
+        "difficulty": "senior",
+        "skills": ["推荐系统", "召回排序", "特征工程", "A/B 测试", "Python"],
+    },
+    {
+        "name": "产品经理",
+        "direction": "product",
+        "difficulty": "mid",
+        "skills": ["需求分析", "PRD", "数据分析", "项目管理", "用户研究"],
+    },
+    {
+        "name": "AI 产品经理",
+        "direction": "product",
+        "difficulty": "senior",
+        "skills": ["大模型应用", "需求分析", "数据分析", "Prompt 设计", "商业化"],
+    },
+    {
+        "name": "数据分析师",
+        "direction": "data",
+        "difficulty": "junior",
+        "skills": ["SQL", "Python", "Excel", "数据可视化", "A/B 测试"],
+    },
+    {
+        "name": "数据仓库工程师",
+        "direction": "data",
+        "difficulty": "senior",
+        "skills": ["数仓建模", "ETL", "Hive", "Spark", "Flink", "Doris"],
+    },
+    {
+        "name": "运营专员",
+        "direction": "operations",
+        "difficulty": "junior",
+        "skills": ["内容运营", "活动策划", "用户增长", "数据分析", "文案"],
+    },
+    {
+        "name": "用户增长运营",
+        "direction": "operations",
+        "difficulty": "mid",
+        "skills": ["增长黑客", "渠道投放", "用户运营", "数据分析", "私域运营"],
+    },
+]
+
+
+def _seed_builtin_positions(db: Session) -> None:
+    """公共岗位库为空且显式启用 builtin 数据源时，才自动初始化内置岗位（幂等）。
+
+    默认数据源为 jobui（职友集真实数据），不再注入示例岗位。
+    """
+    from app.core.config import settings
+
+    if "builtin" not in settings.JOB_SOURCE_ENABLED:
+        return
+    exists = db.scalar(select(Position.id).where(Position.status == "active").limit(1))
+    if exists is not None:
+        return
+    for item in BUILTIN_POSITIONS:
+        db.add(Position(is_public=True, creator_id=None, **item))
+    db.commit()
+
 
 @router.get("")
 def list_atoms(
@@ -48,7 +153,40 @@ def list_atoms(
 
 @router.get("/positions")
 def list_positions(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.scalars(select(Position).where(Position.status == "active")).all()
+    """岗位列表：内置岗位库为空时自动初始化。"""
+    _seed_builtin_positions(db)
+    return db.scalars(select(Position).where(Position.status == "active").order_by(Position.id)).all()
+
+
+@router.post("/positions/sync")
+def trigger_position_sync(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """手动触发一次岗位采集同步（真实数据源）。"""
+    from app.services.job_crawler import sync_jobs
+
+    stats = sync_jobs(db=db)
+    if stats.get("skipped"):
+        return {"ok": False, "reason": stats.get("reason", "已有同步任务进行中"), "stats": stats}
+    return {"ok": True, "stats": stats}
+
+
+@router.get("/positions/sync-config")
+def get_sync_config(user: User = Depends(get_current_user)):
+    """获取岗位自动同步配置与最近同步时间。"""
+    from app.services.sync_state import get_sync_state
+
+    return get_sync_state()
+
+
+@router.post("/positions/sync-config")
+def set_sync_config(
+    auto_enabled: bool | None = None,
+    interval_minutes: int | None = None,
+    user: User = Depends(get_current_user),
+):
+    """调整岗位自动同步频率（分钟）。interval_minutes 最短 5 分钟。"""
+    from app.services.sync_state import update_sync_config
+
+    return update_sync_config(auto_enabled=auto_enabled, interval_minutes=interval_minutes)
 
 
 @router.post("", status_code=201)

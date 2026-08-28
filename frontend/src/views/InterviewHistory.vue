@@ -2,10 +2,13 @@
   <div class="page">
     <div class="page-head">
       <div>
-        <div class="head-title">面试记录</div>
-        <div class="head-sub">每场面试的完整问答与评估都会自动保存，点击任意一场即可复盘。</div>
+        <div class="page-title">面试记录</div>
+        <div class="page-desc">每场面试的完整问答与评估都会自动保存，点击任意一场即可复盘。</div>
       </div>
-      <el-button type="primary" @click="router.push({ name: 'interview' })">开始新面试</el-button>
+      <el-button type="primary" @click="router.push({ name: 'interview' })">
+        <el-icon style="margin-right: 4px"><Plus /></el-icon>
+        开始新面试
+      </el-button>
     </div>
 
     <div v-loading="loading" class="list-wrap">
@@ -130,6 +133,7 @@
 </template>
 
 <script setup>
+import { Plus, Tickets } from '@element-plus/icons-vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -236,20 +240,22 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(120deg, #f8faff 0%, #eef2ff 100%);
-  border: 1px solid #e0e7ff;
-  border-radius: 14px;
-  padding: 18px 22px;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  padding: 14px 20px;
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
 }
-.head-title {
-  font-size: 18px;
+.page-title {
+  font-size: 17px;
   font-weight: 800;
-  color: #1e293b;
+  color: #0f172a;
 }
-.head-sub {
-  font-size: 13px;
-  color: #64748b;
-  margin-top: 4px;
+.page-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
 }
 .list-wrap {
   min-height: 200px;
@@ -269,11 +275,17 @@ onMounted(load)
   border-radius: 12px;
   padding: 16px 20px;
   cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: transform 160ms var(--ease-out), box-shadow 0.2s var(--ease-out), border-color 0.2s ease;
 }
-.card:hover {
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
-  transform: translateY(-1px);
+.card:active {
+  transform: scale(0.99);
+}
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+    transform: translateY(-2px);
+    border-color: rgba(37, 99, 235, 0.3);
+  }
 }
 .card-title {
   display: flex;

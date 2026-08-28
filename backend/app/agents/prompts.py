@@ -1,6 +1,57 @@
 """面试官 Agent 的提示词模板（Phase 1 文字面试）。"""
 
+# 面试官角色人设段（v1.1：选择面试官角色时注入，未选择时留空保持通用人设）
+PERSONA_SECTION = """【面试官人设】
+{persona}
+
+【提问风格要求】
+{style}
+"""
+
+# 难度档位指令（v1.1：选择难度时注入）
+DIFFICULTY_SECTION = """【面试难度：{difficulty_label}】
+{difficulty_rule}
+"""
+
+DIFFICULTY_RULES = {
+    "easy": {
+        "label": "简单",
+        "rule": (
+            "本场为入门难度的面试：以基础概念和核心原理为主，不追问过于冷门的细节；"
+            "候选人答不上时主动给提示和引导（如提示思路、给出类比），适当降低要求，帮助候选人建立信心。"
+        ),
+    },
+    "normal": {
+        "label": "标准",
+        "rule": (
+            "本场为标准难度面试：覆盖岗位核心技能，做常规深度追问；"
+            "候选人回答基本准确时不再死磕，回答有漏洞时正常深挖。"
+        ),
+    },
+    "hard": {
+        "label": "困难",
+        "rule": (
+            "本场为高难度面试：考察底层原理、复杂场景设计与多知识点组合运用；"
+            "对候选人回答保持较高要求，持续深挖直到得到确定性结论，少给提示、容错度低，模拟真实大厂压测。"
+        ),
+    },
+}
+
+
+def build_interviewer_sections(persona: str = "", style: str = "", difficulty: str = "normal") -> str:
+    """拼装面试官人设 + 难度指令段落（均未配置时返回空串，保持原有通用人设）。"""
+    parts = []
+    if (persona or "").strip() or (style or "").strip():
+        parts.append(PERSONA_SECTION.format(persona=persona or "（通用资深面试官，保持专业与友善的平衡）", style=style or "像真人一样自然交流，一次只问一个问题。"))
+    rule = DIFFICULTY_RULES.get(difficulty)
+    if rule:
+        parts.append(DIFFICULTY_SECTION.format(difficulty_label=rule["label"], difficulty_rule=rule["rule"]))
+    return "\n".join(parts)
+
+
 DECISION_PROMPT = """你是资深面试官，正在对候选人进行「{position_name}」岗位的模拟面试。请根据当前进展决定下一步动作。
+
+{interviewer_sections}
 
 【岗位技能要求】
 {position_skills}

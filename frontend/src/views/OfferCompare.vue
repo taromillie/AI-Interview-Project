@@ -1,16 +1,53 @@
 <template>
   <div class="offer-compare">
-    <el-alert
-      title="录入手上拿到的多个 Offer，系统自动计算年化总包并生成结构化对比表，AI 再结合城市生活成本与岗位成长性给出综合建议。"
-      type="info"
-      :closable="false"
-      class="tip"
-    />
+    <div class="page-banner">
+      <div class="banner-left">
+        <div class="banner-icon">
+          <el-icon :size="24"><Trophy /></el-icon>
+        </div>
+        <div>
+          <div class="banner-title">Offer 对比</div>
+          <div class="banner-desc">录入多个 Offer，一键对比总包与 AI 综合建议</div>
+        </div>
+      </div>
+    </div>
 
-    <el-row :gutter="16">
-      <el-col :span="10">
-        <el-card>
-          <template #header>① Offer 录入（至少 2 个可对比）</template>
+    <!-- 向导步骤条 -->
+    <div class="wizard">
+      <template v-for="(s, i) in wizardSteps" :key="s.id">
+        <button
+          class="w-step"
+          :class="{ active: currentStep === s.id, done: maxStep > s.id }"
+          :disabled="s.id > maxStep && s.id !== currentStep + 1"
+          @click="goStep(s.id)"
+        >
+          <span class="w-dot">
+            <el-icon v-if="maxStep > s.id" :size="14"><Check /></el-icon>
+            <template v-else>{{ s.id }}</template>
+          </span>
+          <span class="w-label">{{ s.title }}</span>
+        </button>
+        <span
+          v-if="i < wizardSteps.length - 1"
+          class="w-line"
+          :class="{ done: maxStep > wizardSteps[i].id }"
+        ></span>
+      </template>
+    </div>
+
+    <!-- 步骤内容 -->
+    <div class="w-body">
+      <transition name="wizard" mode="out-in">
+        <!-- ① 录入 -->
+        <section v-if="currentStep === 1" key="s1" class="w-card">
+          <div class="w-head">
+            <span class="w-ico"><el-icon :size="20"><Trophy /></el-icon></span>
+            <div>
+              <div class="w-title">录入你的 Offer</div>
+              <div class="w-desc">至少添加 2 个 Offer 才能开始对比</div>
+            </div>
+          </div>
+
           <el-form label-position="top">
             <el-row :gutter="12">
               <el-col :span="12">
@@ -66,64 +103,49 @@
             <el-form-item label="备注">
               <el-input v-model="form.notes" placeholder="如：技术成长空间大 / 需要 995" />
             </el-form-item>
-            <div class="form-actions">
-              <el-button type="primary" :disabled="!form.company.trim()" @click="saveOffer">
-                添加 Offer
-              </el-button>
-              <el-button
-                type="success"
-                :disabled="offers.length < 2"
-                :loading="comparing"
-                @click="runCompare"
-              >
-                AI 对比分析
-              </el-button>
-            </div>
-          </el-form>
-        </el-card>
-
-        <el-card class="offer-list-card">
-          <template #header>
-            我的 Offer（{{ offers.length }}）
-            <el-button
-              v-if="compare.table.length"
-              type="primary"
-              text
-              size="small"
-              @click="runCompare"
-            >
-              重新对比
+            <el-button type="primary" :disabled="!form.company.trim()" class="add-btn" @click="saveOffer">
+              <el-icon class="el-icon--left"><Plus /></el-icon>
+              添加 Offer
             </el-button>
+          </el-form>
+
+          <template v-if="offers.length">
+            <el-divider content-position="left">已添加（{{ offers.length }} 个）</el-divider>
+            <div class="offer-list">
+              <div v-for="o in offers" :key="o.id" class="offer-item">
+                <div class="offer-main">
+                  <div class="offer-title">
+                    {{ o.company }}
+                    <el-tag v-if="o.position" size="small" effect="plain">{{ o.position }}</el-tag>
+                    <el-tag v-if="o.city" size="small" effect="plain" type="info">{{ o.city }}</el-tag>
+                  </div>
+                  <div class="offer-sub">
+                    月薪 {{ o.monthly_salary }} 元 × {{ 12 + o.bonus_months }} 薪
+                    <template v-if="o.stock_value"> + 股票 {{ o.stock_value }} 元/年</template>
+                    · 年化总包 {{ formatMoney(annualOf(o)) }}
+                  </div>
+                </div>
+                <div class="offer-ops">
+                  <el-tag size="small" :type="balanceType(o.work_balance)">
+                    平衡 {{ o.work_balance }}/10
+                  </el-tag>
+                  <el-button size="small" text type="danger" @click="removeOffer(o)">删除</el-button>
+                </div>
+              </div>
+            </div>
           </template>
-          <div v-if="offers.length" class="offer-list">
-            <div v-for="o in offers" :key="o.id" class="offer-item">
-              <div class="offer-main">
-                <div class="offer-title">
-                  {{ o.company }}
-                  <el-tag v-if="o.position" size="small" effect="plain">{{ o.position }}</el-tag>
-                  <el-tag v-if="o.city" size="small" effect="plain" type="info">{{ o.city }}</el-tag>
-                </div>
-                <div class="offer-sub">
-                  月薪 {{ o.monthly_salary }} 元 × {{ 12 + o.bonus_months }} 薪
-                  <template v-if="o.stock_value"> + 股票 {{ o.stock_value }} 元/年</template>
-                  · 年化总包 {{ formatMoney(annualOf(o)) }}
-                </div>
-              </div>
-              <div class="offer-ops">
-                <el-tag size="small" :type="balanceType(o.work_balance)">
-                  平衡 {{ o.work_balance }}/10
-                </el-tag>
-                <el-button size="small" text type="danger" @click="removeOffer(o)">删除</el-button>
-              </div>
+          <el-empty v-else description="还没有 Offer，先在上方添加吧" :image-size="60" />
+        </section>
+
+        <!-- ② 结果 -->
+        <section v-else key="s2" class="w-card">
+          <div class="w-head">
+            <span class="w-ico green"><el-icon :size="20"><DataAnalysis /></el-icon></span>
+            <div>
+              <div class="w-title">对比结果</div>
+              <div class="w-desc">各维度对比与 AI 综合建议</div>
             </div>
           </div>
-          <el-empty v-else description="还没有 Offer，先添加吧" :image-size="50" />
-        </el-card>
-      </el-col>
-
-      <el-col :span="14">
-        <el-card>
-          <template #header>② 对比结果</template>
 
           <template v-if="compare.table.length">
             <el-table :data="compare.table" border size="small" class="cmp-table">
@@ -153,18 +175,55 @@
 
           <el-empty
             v-else
-            description="录入至少 2 个 Offer 后点击「AI 对比分析」"
+            description="录入至少 2 个 Offer 后点击「开始对比」"
             :image-size="80"
           />
-        </el-card>
-      </el-col>
-    </el-row>
+        </section>
+      </transition>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="w-nav">
+      <el-button v-if="currentStep === 2" size="large" @click="currentStep = 1">
+        <el-icon><ArrowLeft /></el-icon>
+        <span class="nav-text">返回修改</span>
+      </el-button>
+      <div class="w-nav-spacer"></div>
+      <template v-if="currentStep === 1">
+        <div class="nav-hint">{{ offers.length < 2 ? `还需 ${2 - offers.length} 个 Offer` : `已添加 ${offers.length} 个，可以对比了` }}</div>
+        <el-button
+          type="primary"
+          size="large"
+          :loading="comparing"
+          :disabled="offers.length < 2"
+          @click="goNext"
+        >
+          {{ comparing ? '正在对比…' : '开始对比' }}
+          <el-icon v-if="!comparing" class="el-icon--right"><MagicStick /></el-icon>
+        </el-button>
+      </template>
+      <template v-else>
+        <el-button type="primary" size="large" :loading="comparing" @click="runCompare">
+          重新对比
+          <el-icon class="el-icon--right"><RefreshRight /></el-icon>
+        </el-button>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ArrowLeft,
+  Check,
+  DataAnalysis,
+  MagicStick,
+  Plus,
+  RefreshRight,
+  Trophy,
+} from '@element-plus/icons-vue'
 import {
   compareOffers,
   createOffer,
@@ -189,6 +248,30 @@ const form = reactive({
 const offers = ref([])
 const compare = ref({ table: [], analysis: '' })
 const comparing = ref(false)
+
+// ── 向导状态 ──
+const wizardSteps = [
+  { id: 1, title: '录入 Offer' },
+  { id: 2, title: '查看对比' },
+]
+const currentStep = ref(1)
+const maxStep = ref(1)
+
+function goNext() {
+  if (offers.value.length < 2) {
+    ElMessage.warning('至少需要 2 个 Offer 才能对比')
+    return
+  }
+  runCompare()
+}
+
+function goStep(n) {
+  if (n === currentStep.value) return
+  if (n <= maxStep.value || n === currentStep.value + 1) {
+    if (n === currentStep.value + 1) goNext()
+    else currentStep.value = n
+  }
+}
 
 function annualOf(o) {
   return o.monthly_salary * (12 + o.bonus_months) + o.stock_value
@@ -246,7 +329,11 @@ async function saveOffer() {
 }
 
 async function removeOffer(o) {
-  await ElMessageBox.confirm(`确定删除 ${o.company} 的 Offer？`, '提示', { type: 'warning' })
+  try {
+    await ElMessageBox.confirm(`确定删除 ${o.company} 的 Offer？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
   await deleteOffer(o.id)
   ElMessage.success('已删除')
   compare.value = { table: [], analysis: '' }
@@ -257,6 +344,8 @@ async function runCompare() {
   comparing.value = true
   try {
     compare.value = await compareOffers()
+    currentStep.value = 2
+    maxStep.value = 2
     ElMessage.success('对比分析完成')
   } finally {
     comparing.value = false
@@ -269,18 +358,173 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.tip {
-  margin-bottom: 16px;
+/* ── 向导步骤条 ── */
+.wizard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 880px;
+  margin: 0 auto 20px;
+  padding: 18px 28px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
 }
+.w-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.w-step:active {
+  transform: scale(0.96);
+}
+.w-step:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.w-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.w-step.active .w-dot {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+.w-step.done .w-dot {
+  color: #fff;
+  background: #10b981;
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.14);
+}
+.w-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  transition: color 0.25s ease;
+}
+.w-step.active .w-label {
+  color: #2563eb;
+}
+.w-step.done .w-label {
+  color: #0f172a;
+}
+.w-line {
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  margin: 0 12px;
+  transition: background 0.3s ease;
+}
+.w-line.done {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+/* ── 步骤卡片 ── */
+.w-body {
+  max-width: 880px;
+  margin: 0 auto;
+}
+.w-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  padding: 26px 30px 30px;
+}
+.w-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.w-ico {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+}
+.w-ico.green {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.25);
+}
+.w-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.w-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+/* ── 底部导航 ── */
+.w-nav {
+  max-width: 880px;
+  margin: 18px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.w-nav-spacer {
+  flex: 1;
+}
+.nav-text {
+  margin: 0 4px;
+}
+.nav-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ── 切换动画 ── */
+.wizard-enter-active {
+  transition: all 0.32s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.wizard-leave-active {
+  transition: all 0.18s ease;
+}
+.wizard-enter-from {
+  opacity: 0;
+  transform: translateY(18px) scale(0.99);
+}
+.wizard-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
+}
+
+/* ── 原有表单/结果样式 ── */
 .full {
   width: 100%;
 }
-.form-actions {
-  display: flex;
-  gap: 10px;
-}
-.offer-list-card {
-  margin-top: 16px;
+.add-btn {
+  width: 100%;
 }
 .offer-list {
   display: flex;
@@ -292,9 +536,18 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border-radius: 12px;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    border-color 0.2s ease;
+}
+.offer-item:hover {
+  border-color: var(--app-brand, #2563eb);
+}
+.offer-main {
+  flex: 1;
+  min-width: 0;
 }
 .offer-title {
   display: flex;

@@ -1,6 +1,7 @@
 """ORM 模型统一导出，确保 init_db 时全部注册。"""
 from app.models.career import AbilityProfile, CareerPlan, SalaryEval
 from app.models.interview import Interview, InterviewMessage, Report
+from app.models.interviewer import Interviewer
 from app.models.offer import Offer
 from app.models.position import KnowledgeAtom, Position
 from app.models.real_interview import RealInterview, RealInterviewItem
@@ -19,6 +20,7 @@ __all__ = [
     "Interview",
     "InterviewMessage",
     "Report",
+    "Interviewer",
     "AbilityProfile",
     "CareerPlan",
     "SalaryEval",

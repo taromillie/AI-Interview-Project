@@ -1,289 +1,513 @@
 <template>
   <div class="interview-page">
-    <!-- 会话设置 -->
-    <el-card v-if="stage === 'setup'" class="setup-card">
-      <template #header>
-        <div class="setup-head">
-          <span class="setup-title">开始一场模拟面试</span>
-          <span class="setup-sub">面试官将基于你的简历与岗位要求进行多轮动态追问，结束后自动生成复盘报告</span>
-        </div>
-      </template>
-      <el-form label-width="90px" class="setup-form">
-        <el-form-item label="目标岗位">
-          <el-select
-            v-model="positionSel"
-            filterable
-            allow-create
-            default-first-option
-            clearable
-            placeholder="从题库 / 我的 JD 选择，或直接输入自定义岗位"
-            style="width: 100%"
+    <!-- ================= 向导式设置区 ================= -->
+    <template v-if="!session">
+      <div class="page-head">
+        <div class="page-title">模拟面试</div>
+        <div class="page-desc">三步完成设置，选择你的目标岗位、面试官与难度</div>
+      </div>
+
+      <!-- 步骤条 -->
+      <div class="wizard">
+        <template v-for="(s, i) in wizardSteps" :key="s.id">
+          <button
+            class="w-step"
+            :class="{ active: currentStep === s.id, done: maxStep > s.id }"
+            :disabled="s.id > maxStep && s.id !== currentStep + 1"
+            @click="goStep(s.id)"
           >
-            <el-option-group label="我的 JD">
-              <el-option
-                v-for="jd in jds"
-                :key="`jd-${jd.id}`"
-                :label="jd.title || `JD #${jd.id}`"
-                :value="`jd:${jd.title || `JD #${jd.id}`}`"
-              />
-            </el-option-group>
-            <el-option-group label="题库岗位">
-              <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="`pos:${p.id}`" />
-            </el-option-group>
-          </el-select>
-          <div class="form-tip">也可输入任意岗位名（自定义）</div>
-        </el-form-item>
-        <el-form-item label="使用简历">
-          <el-select v-model="resumeId" clearable placeholder="可选，留空则不绑定简历" style="width: 100%">
-            <el-option
-              v-for="r in resumes"
-              :key="r.id"
-              :label="`简历 #${r.id}（${r.skills.length} 项技能）`"
-              :value="r.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="面试轮数">
-          <el-input-number v-model="maxRounds" :min="3" :max="20" />
-          <span class="form-tip">含开场提问，达到轮数后自动结束</span>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" round :loading="starting" class="start-btn" @click="startInterview">
-            开始面试
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <!-- 对话界面 -->
-    <div v-else class="chat-shell">
-      <header class="chat-header">
-        <div class="chat-title">
-          <span class="live-dot"></span>
-          <span class="chat-title-text">模拟面试中</span>
-          <span class="chat-rounds">共 {{ maxRounds }} 轮</span>
-        </div>
-        <el-button size="small" type="danger" plain round :disabled="busy || stage === 'ended'" @click="finishNow">
-          结束面试
-        </el-button>
-      </header>
-
-      <div ref="chatBox" class="chat-box">
-        <div
-          v-for="(m, i) in messages"
-          :key="i"
-          class="msg-row"
-          :class="m.role === 'user' ? 'msg-user' : 'msg-assistant'"
-        >
-          <div class="msg-avatar">{{ m.role === 'user' ? '我' : '面' }}</div>
-          <div class="bubble">
-            <span v-if="m.role === 'assistant' && m.strategy" class="strategy-tag" :class="`tag-${m.strategy}`">
-              {{ strategyText(m.strategy) }}
+            <span class="w-dot">
+              <el-icon v-if="maxStep > s.id" :size="14"><Check /></el-icon>
+              <template v-else>{{ s.id }}</template>
             </span>
-            <div class="bubble-text">{{ m.content }}</div>
+            <span class="w-label">{{ s.title }}</span>
+          </button>
+          <span
+            v-if="i < wizardSteps.length - 1"
+            class="w-line"
+            :class="{ done: maxStep > wizardSteps[i].id }"
+          ></span>
+        </template>
+      </div>
+
+      <!-- 步骤内容 -->
+      <div class="w-body">
+        <transition name="wizard" mode="out-in">
+          <!-- ① 目标岗位 -->
+          <section v-if="currentStep === 1" key="s1" class="w-card">
+            <div class="w-head">
+              <span class="w-ico"><el-icon :size="20"><Aim /></el-icon></span>
+              <div>
+                <div class="w-title">选择目标岗位</div>
+                <div class="w-desc">面试问题将围绕该岗位的技能要求展开</div>
+              </div>
+            </div>
+
+            <el-form label-position="top">
+              <el-form-item label="岗位">
+                <el-radio-group v-model="positionMode" class="mode-group">
+                  <el-radio-button value="preset">岗位库</el-radio-button>
+                  <el-radio-button value="custom">自定义</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+
+              <el-form-item v-if="positionMode === 'preset'">
+                <el-select
+                  v-model="selectedPositionId"
+                  filterable
+                  placeholder="从岗位库选择（支持关键词搜索）"
+                  class="full"
+                >
+                  <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id">
+                    <span>{{ p.name }}</span>
+                    <span class="opt-meta">{{ positionMeta(p) }}</span>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item v-else label="岗位名称">
+                <el-input
+                  v-model="customPosition"
+                  placeholder="如：后端开发工程师、AI 产品经理…"
+                  maxlength="60"
+                  @keyup.enter="goNext"
+                />
+              </el-form-item>
+
+              <el-form-item label="使用简历（可选）">
+                <el-select v-model="selectedResumeId" clearable placeholder="不选则使用最近一份简历" class="full">
+                  <el-option v-for="r in resumes" :key="r.id" :label="r.name || `简历 #${r.id}`" :value="r.id" />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </section>
+
+          <!-- ② 面试官 -->
+          <section v-else-if="currentStep === 2" key="s2" class="w-card">
+            <div class="w-head">
+              <span class="w-ico grad"><el-icon :size="20"><User /></el-icon></span>
+              <div>
+                <div class="w-title">选择面试官</div>
+                <div class="w-desc">不同角色的人设与提问风格会注入本次面试</div>
+              </div>
+            </div>
+
+            <div class="interviewer-grid">
+              <button
+                v-for="iv in interviewers"
+                :key="iv.id"
+                class="iv-card"
+                :class="{ on: selectedInterviewerId === iv.id }"
+                @click="selectedInterviewerId = iv.id"
+              >
+                <div class="iv-top">
+                  <div class="iv-avatar">{{ iv.name.slice(0, 1) }}</div>
+                  <div class="iv-info">
+                    <div class="iv-name">{{ iv.name }}</div>
+                    <div class="iv-title">{{ iv.title || '面试官' }}</div>
+                  </div>
+                  <el-icon v-if="selectedInterviewerId === iv.id" class="iv-check"><Check /></el-icon>
+                </div>
+                <div class="iv-persona">{{ iv.persona || '专业、严谨，关注你的真实能力。' }}</div>
+                <div class="iv-tags">
+                  <span class="iv-tag">{{ typeText(iv.interview_type) }}</span>
+                  <span class="iv-tag">{{ biasText(iv.difficulty_bias) }}</span>
+                </div>
+              </button>
+            </div>
+            <div v-if="!interviewers.length" class="loading-text">正在加载面试官角色…</div>
+          </section>
+
+          <!-- ③ 难度 + 开始 -->
+          <section v-else key="s3" class="w-card">
+            <div class="w-head">
+              <span class="w-ico green"><el-icon :size="20"><DataAnalysis /></el-icon></span>
+              <div>
+                <div class="w-title">选择面试难度</div>
+                <div class="w-desc">难度决定问题深度与追问强度</div>
+              </div>
+            </div>
+
+            <div class="difficulty-grid">
+              <button
+                v-for="d in difficulties"
+                :key="d.value"
+                class="diff-card"
+                :class="{ on: selectedDifficulty === d.value }"
+                @click="selectedDifficulty = d.value"
+              >
+                <div class="diff-name">{{ d.label }}</div>
+                <div class="diff-desc">{{ d.desc }}</div>
+              </button>
+            </div>
+
+            <el-form label-position="top" class="rounds-form">
+              <el-form-item label="面试轮数">
+                <el-slider v-model="maxRounds" :min="3" :max="12" :marks="{ 3: '3', 6: '6', 9: '9', 12: '12' }" />
+              </el-form-item>
+            </el-form>
+
+            <div class="start-summary">
+              <span class="sum-item">
+                <span class="sum-label">岗位</span>
+                <b>{{ positionLabel }}</b>
+              </span>
+              <span class="sum-item">
+                <span class="sum-label">面试官</span>
+                <b>{{ interviewerLabel }}</b>
+              </span>
+              <span class="sum-item">
+                <span class="sum-label">难度</span>
+                <b>{{ difficultyLabel }}</b>
+              </span>
+            </div>
+          </section>
+        </transition>
+      </div>
+
+      <!-- 底部导航 -->
+      <div class="w-nav">
+        <el-button v-if="currentStep > 1" size="large" @click="goPrev">
+          <el-icon><ArrowLeft /></el-icon>
+          <span class="nav-text">上一步</span>
+        </el-button>
+        <div class="w-nav-spacer"></div>
+        <template v-if="currentStep < 3">
+          <div v-if="currentStep === 1" class="nav-hint">{{ positionLabel }}</div>
+          <div v-else class="nav-hint">{{ interviewerLabel || '选择一个面试官' }}</div>
+          <el-button
+            type="primary"
+            size="large"
+            :disabled="!canNext"
+            @click="goNext"
+          >
+            下一步
+            <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button type="primary" size="large" :loading="creating" @click="createSession">
+            <el-icon v-if="!creating" class="el-icon--left"><MagicStick /></el-icon>
+            {{ creating ? '正在准备面试…' : '开始面试' }}
+          </el-button>
+        </template>
+      </div>
+    </template>
+
+    <!-- ================= 对话区 ================= -->
+    <div v-else class="chat-shell">
+      <div class="chat-head">
+        <div class="chat-meta">
+          <div class="chat-title">{{ sessionPositionLabel }}</div>
+          <div class="chat-sub">
+            <span>{{ interviewerLabel || 'AI 面试官' }}</span>
+            <span class="chat-dot">·</span>
+            <span>{{ difficultyLabel }}</span>
+            <span class="chat-dot">·</span>
+            <span>第 {{ chatMessages.filter((m) => m.role === 'ai').length }}/{{ maxRounds }} 轮</span>
           </div>
         </div>
-        <div v-if="status" class="status-line">
-          <span class="dots"><i></i><i></i><i></i></span>
-          <span>{{ status }}</span>
+        <el-button size="small" @click="endEarly">结束面试</el-button>
+      </div>
+
+      <div ref="chatBody" class="chat-body">
+        <template v-for="(m, i) in chatMessages" :key="i">
+          <div v-if="m.role === 'ai'" class="msg ai">
+            <div class="msg-avatar ai-avatar">{{ interviewerLabel.slice(0, 1) }}</div>
+            <div class="msg-bubble ai-bubble">{{ m.content }}</div>
+          </div>
+          <div v-else class="msg user">
+            <div class="msg-bubble user-bubble">{{ m.content }}</div>
+          </div>
+        </template>
+        <div v-if="chatLoading" class="msg ai">
+          <div class="msg-avatar ai-avatar">AI</div>
+          <div class="msg-bubble ai-bubble thinking">
+            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+          </div>
         </div>
       </div>
 
-      <div class="input-area">
+      <div class="chat-input">
         <el-input
-          v-model="input"
+          v-model="answerDraft"
           type="textarea"
           :rows="2"
+          :disabled="!waitingAnswer"
+          :placeholder="waitingAnswer ? '输入你的回答，Enter 发送，Shift+Enter 换行' : '面试官正在提问…'"
           resize="none"
-          :disabled="busy || stage === 'ended'"
-          placeholder="输入你的回答，回车发送（Shift+Enter 换行）"
-          @keydown.enter.exact.prevent="send"
+          @keydown.enter.exact.prevent="sendAnswer"
         />
-        <el-button
-          type="primary"
-          round
-          class="send-btn"
-          :disabled="busy || stage === 'ended' || !input.trim()"
-          :loading="busy"
-          @click="send"
-        >
-          <el-icon v-if="!busy"><Promotion /></el-icon>
-          <span v-if="!busy">发送</span>
-        </el-button>
+        <button class="send-btn" :disabled="!waitingAnswer || !answerDraft.trim()" @click="sendAnswer">
+          <el-icon :size="18"><Promotion /></el-icon>
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { nextTick, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Promotion } from '@element-plus/icons-vue'
-import { answerInterview, createInterview, finishInterview, listInterviews, startInterview as startInterviewApi } from '@/api/interview'
-import { listJds, listResumes } from '@/api/diagnostic'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  DataAnalysis,
+  Aim,
+  MagicStick,
+  Promotion,
+  User,
+} from '@element-plus/icons-vue'
+import { listResumes } from '@/api/diagnostic'
 import { listPositions } from '@/api/question'
+import { listInterviewers } from '@/api/interviewer'
+import { answerInterview, createInterview, finishInterview, startInterview } from '@/api/interview'
 
-const router = useRouter()
+const route = useRoute()
 
-const stage = ref('setup')
+// ── 向导状态 ──
+const wizardSteps = [
+  { id: 1, title: '目标岗位' },
+  { id: 2, title: '面试官' },
+  { id: 3, title: '难度' },
+]
+const currentStep = ref(1)
+const maxStep = ref(1)
+
+// ── 设置数据 ──
+const positionMode = ref('preset')
 const positions = ref([])
+const selectedPositionId = ref(null)
+const customPosition = ref('')
 const resumes = ref([])
-const jds = ref([])
-const positionSel = ref('')
-const resumeId = ref(null)
+const selectedResumeId = ref(null)
+
+const interviewers = ref([])
+const selectedInterviewerId = ref(null)
+
+const difficulties = [
+  { value: 'easy', label: '简单', desc: '基础概念为主，答不上会引导提示，适合初次练习' },
+  { value: 'normal', label: '标准', desc: '常规深度，正常追问，适合系统备战' },
+  { value: 'hard', label: '困难', desc: '原理深挖 + 组合场景，少提示低容错，模拟大厂压测' },
+]
+const selectedDifficulty = ref('normal')
 const maxRounds = ref(6)
-const starting = ref(false)
-const busy = ref(false)
+
+const session = ref(null)
+const creating = ref(false)
+const chatMessages = ref([])
+const chatLoading = ref(false)
+const waitingAnswer = ref(false)
+const answerDraft = ref('')
 const interviewId = ref(null)
-const messages = ref([])
-const input = ref('')
-const status = ref('')
-const chatBox = ref(null)
+const chatBody = ref(null)
+const canUseVoice = false
 
-const STRATEGY_TEXT = {
-  opening: '开场',
-  deep_dive: '深入追问',
-  probe: '澄清追问',
-  remedy: '拉回正题',
-  switch_topic: '切换话题',
-  project_probe: '项目追问',
-  farewell: '结束语',
-  none: '提问',
-}
-function strategyText(s) {
-  return STRATEGY_TEXT[s] || s
+// ── 派生 ──
+const positionLabel = computed(() => {
+  if (positionMode.value === 'preset') {
+    const p = positions.value.find((x) => x.id === selectedPositionId.value)
+    return p ? p.name : ''
+  }
+  return customPosition.value.trim() || ''
+})
+
+const canNext = computed(() => {
+  if (currentStep.value === 1) return !!positionLabel.value
+  if (currentStep.value === 2) return selectedInterviewerId.value != null
+  return true
+})
+
+const interviewerLabel = computed(() => {
+  const iv = interviewers.value.find((x) => x.id === selectedInterviewerId.value)
+  return iv ? iv.name : ''
+})
+
+const difficultyLabel = computed(() => {
+  const d = difficulties.find((x) => x.value === selectedDifficulty.value)
+  return d ? d.label : ''
+})
+
+const sessionPositionLabel = computed(() => {
+  const p = positions.value.find((x) => x.id === selectedPositionId.value)
+  return p ? p.name : (customPosition.value.trim() || '模拟面试')
+})
+
+function positionMeta(p) {
+  const d = { junior: '初级', mid: '中级', senior: '高级' }[p.difficulty] || p.difficulty || ''
+  const dir = { backend: '后端', frontend: '前端', algorithm: '算法', product: '产品', operations: '运营', data: '数据' }[p.direction] || ''
+  return `${dir} ${d}`.trim()
 }
 
-async function scrollBottom() {
-  await nextTick()
-  const box = chatBox.value
-  if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' })
+function typeText(t) {
+  return { all: '通用', normal: '常规面', switch: '转行面', salary: '谈薪面' }[t] || t
+}
+function biasText(b) {
+  return b === 1 ? '偏难' : b === -1 ? '偏易' : '难度中性'
 }
 
-// 面试官消息：reactive 包装确保响应式立即生效，收到即完整显示，无需等待用户输入
-function pushAssistant(text, strategy) {
-  const msg = reactive({ role: 'assistant', content: text, strategy: strategy || 'none', typing: false })
-  messages.value.push(msg)
-  scrollBottom()
-}
-
-async function loadOptions() {
-  try {
-    const [p, r, j] = await Promise.all([listPositions(), listResumes(), listJds()])
-    positions.value = p.filter((x) => x.status === 'active')
-    resumes.value = r
-    jds.value = j
-  } catch {
-    /* 忽略，设置页允许留空 */
+// ── 步骤导航 ──
+function goNext() {
+  if (currentStep.value === 1 && !positionLabel.value) {
+    ElMessage.warning('请先选择或输入目标岗位')
+    return
+  }
+  if (currentStep.value === 2 && selectedInterviewerId.value == null) {
+    ElMessage.warning('请选择一个面试官')
+    return
+  }
+  if (currentStep.value < 3) {
+    currentStep.value++
+    maxStep.value = Math.max(maxStep.value, currentStep.value)
   }
 }
 
-// 解析目标岗位选择值：pos:12 → 题库；jd:xx / 其他 → 自定义岗位文本
-function parsePosition(sel) {
-  if (!sel) return { position_id: null, target_position: null }
-  if (sel.startsWith('pos:')) {
-    const id = Number(sel.slice(4))
-    return { position_id: Number.isInteger(id) ? id : null, target_position: null }
-  }
-  let name = sel
-  if (sel.startsWith('jd:')) name = sel.slice(3)
-  return { position_id: null, target_position: name.trim() }
+function goPrev() {
+  if (currentStep.value > 1) currentStep.value--
 }
 
-async function startInterview() {
-  starting.value = true
+function goStep(n) {
+  if (n === currentStep.value) return
+  if (n <= maxStep.value || n === currentStep.value + 1) {
+    if (n === currentStep.value + 1) goNext()
+    else currentStep.value = n
+  }
+}
+
+// ── 创建面试 ──
+async function createSession() {
+  creating.value = true
   try {
-    const { position_id, target_position } = parsePosition(positionSel.value)
-    const iv = await createInterview({
-      position_id,
-      target_position,
-      resume_id: resumeId.value || null,
+    const payload = {
       mode: 'text',
+      interview_type: 'normal',
       max_rounds: maxRounds.value,
-    })
-    interviewId.value = iv.id
-    stage.value = 'talking'
-    await startInterviewApi(iv.id, {
-      onEvent: handleEvent,
-    })
+      difficulty: selectedDifficulty.value,
+      interviewer_id: selectedInterviewerId.value,
+    }
+    if (positionMode.value === 'preset') payload.position_id = selectedPositionId.value
+    else payload.target_position = customPosition.value.trim()
+    if (selectedResumeId.value) payload.resume_id = selectedResumeId.value
+
+    const s = await createInterview(payload)
+    session.value = s
+    interviewId.value = s.id
+    chatMessages.value = []
+    await beginChat()
   } catch (e) {
-    ElMessage.error(e.message || '创建面试失败')
+    ElMessage.error(e.response?.data?.detail || e.message || '创建面试失败')
   } finally {
-    starting.value = false
+    creating.value = false
   }
 }
 
-function handleEvent(event, data) {
-  if (event === 'preparing') {
-    status.value = '面试官已就绪，正在出题…'
-  } else if (event === 'thinking') {
-    status.value = '面试官正在思考…'
-  } else if (event === 'question') {
-    status.value = ''
-    pushAssistant(data.question, data.strategy)
-  } else if (event === 'farewell') {
-    status.value = '正在生成复盘报告，请稍候…'
-    pushAssistant(data.message, 'farewell')
-  } else if (event === 'finished') {
-    status.value = ''
-    ElMessage.success(data.message || '面试结束，报告已生成')
-    stage.value = 'ended'
-    setTimeout(() => router.push({ name: 'report', params: { id: data.report_id } }), 800)
-  } else if (event === 'error') {
-    status.value = ''
-    ElMessage.error(data.message || '面试出现异常')
-  }
-}
-
-async function send() {
-  const content = input.value.trim()
-  if (!content || busy.value) return
-  input.value = ''
-  messages.value.push({ role: 'user', content })
-  scrollBottom()
-  busy.value = true
+async function beginChat() {
+  chatLoading.value = true
+  waitingAnswer.value = true
   try {
-    await answerInterview(interviewId.value, content, { onEvent: handleEvent })
-  } catch (e) {
-    status.value = ''
-    ElMessage.error(e.message || '发送失败')
-  } finally {
-    busy.value = false
-  }
-}
-
-async function finishNow() {
-  busy.value = true
-  status.value = '面试官正在收尾并生成报告…'
-  try {
-    const r = await finishInterview(interviewId.value)
-    if (r.farewell) pushAssistant(r.farewell, 'farewell')
-    ElMessage.success(r.message || '面试已结束')
-    stage.value = 'ended'
-    router.push({ name: 'report', params: { id: r.report_id } })
-  } catch (e) {
-    ElMessage.error(e.message || '结束失败')
-  } finally {
-    busy.value = false
-    status.value = ''
-  }
-}
-
-onMounted(() => {
-  loadOptions()
-  // 若有进行中的面试直接进入对话（恢复最近一场）
-  listInterviews()
-    .then((list) => {
-      const ongoing = list.find((i) => ['created', 'asking'].includes(i.status))
-      if (ongoing) {
-        interviewId.value = ongoing.id
-        maxRounds.value = ongoing.max_rounds
-        stage.value = 'talking'
-        ElMessage.info('已恢复上一场未完成的面试')
-      }
+    await startInterview(interviewId.value, {
+      onEvent: (ev) => {
+        if (ev.type === 'question') {
+          chatMessages.value.push({ role: 'ai', content: ev.data?.content || ev.data })
+        } else if (ev.type === 'finished') {
+          waitingAnswer.value = false
+        }
+      },
     })
-    .catch(() => {})
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || e.message || '面试启动失败')
+    await finishInterview(interviewId.value)
+    session.value = null
+    return
+  } finally {
+    chatLoading.value = false
+  }
+  scrollToBottom()
+}
+
+async function sendAnswer() {
+  const content = answerDraft.value.trim()
+  if (!content || !waitingAnswer.value) return
+  chatMessages.value.push({ role: 'user', content })
+  answerDraft.value = ''
+  waitingAnswer.value = false
+  chatLoading.value = true
+  scrollToBottom()
+  try {
+    await answerInterview(interviewId.value, content, {
+      onEvent: (ev) => {
+        if (ev.type === 'question') {
+          chatMessages.value.push({ role: 'ai', content: ev.data?.content || ev.data })
+          waitingAnswer.value = true
+        } else if (ev.type === 'finished') {
+          const detail = ev.data || {}
+          ElMessage.success(detail.analysis ? '面试完成，报告已生成' : '面试结束')
+          waitingAnswer.value = false
+        } else if (ev.type === 'error') {
+          ElMessage.error(ev.data?.detail || '面试出错')
+        }
+      },
+    })
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || e.message || '提交失败')
+  } finally {
+    chatLoading.value = false
+  }
+  scrollToBottom()
+}
+
+async function endEarly() {
+  if (chatMessages.value.length === 0) {
+    session.value = null
+    return
+  }
+  try {
+    await finishInterview(interviewId.value)
+    ElMessage.success('面试已结束，报告已生成')
+  } catch {
+    ElMessage.warning('面试已结束')
+  }
+  session.value = null
+}
+
+function scrollToBottom() {
+  nextTick(() => {
+    if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight
+  })
+}
+
+// 从岗位广场 / 首页跳转时带入岗位
+function applyQueryParams() {
+  const pid = Number(route.query.position_id)
+  if (pid && positions.value.some((x) => x.id === pid)) {
+    positionMode.value = 'preset'
+    selectedPositionId.value = pid
+  }
+  const t = route.query.target
+  if (t) {
+    positionMode.value = 'custom'
+    customPosition.value = String(t)
+  }
+}
+
+watch(currentStep, scrollToBottom)
+
+onMounted(async () => {
+  try {
+    positions.value = await listPositions()
+  } catch { /* 忽略 */ }
+  try {
+    resumes.value = await listResumes()
+  } catch { /* 忽略 */ }
+  try {
+    interviewers.value = await listInterviewers()
+    if (interviewers.value.length) {
+      selectedInterviewerId.value = interviewers.value[0].id
+    }
+  } catch { /* 忽略 */ }
+  applyQueryParams()
 })
 </script>
 
@@ -291,302 +515,443 @@ onMounted(() => {
 .interview-page {
   max-width: 880px;
   margin: 0 auto;
-  height: calc(100vh - 140px);
-  display: flex;
-  flex-direction: column;
 }
 
-/* ---------- 设置页 ---------- */
-.setup-card {
-  margin: 12px 0;
-  border: none;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 30px rgba(15, 23, 42, 0.06);
+/* ── 页头 ── */
+.page-head {
+  padding: 4px 0 18px;
+  text-align: center;
 }
-.setup-card :deep(.el-card__header) {
-  padding: 22px 24px 0;
-  border: none;
-}
-.setup-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.setup-title {
-  font-size: 20px;
-  font-weight: 700;
+.page-title {
+  font-size: 26px;
+  font-weight: 800;
   color: #0f172a;
-  letter-spacing: 0.2px;
 }
-.setup-sub {
+.page-desc {
+  margin-top: 6px;
   font-size: 13px;
   color: #64748b;
 }
-.setup-card :deep(.el-card__body) {
-  padding: 20px 24px 28px;
+
+/* ── 步骤条 ── */
+.wizard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  padding: 16px 26px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
 }
-.setup-form {
-  max-width: 560px;
-  margin-top: 8px;
+.w-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
-.form-tip {
-  margin-left: 12px;
+.w-step:active { transform: scale(0.96); }
+.w-step:disabled { cursor: default; opacity: 0.55; }
+.w-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
   color: #94a3b8;
-  font-size: 12px;
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
-.start-btn {
-  min-width: 140px;
-  margin-top: 6px;
+.w-step.active .w-dot {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+.w-step.done .w-dot {
+  color: #fff;
+  background: #10b981;
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.14);
+}
+.w-label {
+  font-size: 14px;
   font-weight: 600;
+  color: #64748b;
+  transition: color 0.25s ease;
+}
+.w-step.active .w-label { color: #2563eb; }
+.w-step.done .w-label { color: #0f172a; }
+.w-line {
+  width: 52px;
+  height: 3px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  margin: 0 12px;
+  transition: background 0.3s ease;
+}
+.w-line.done { background: linear-gradient(90deg, #10b981, #34d399); }
+
+/* ── 步骤卡片 ── */
+.w-body { margin-bottom: 0; }
+.w-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  padding: 24px 28px 26px;
+}
+.w-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.w-ico {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+}
+.w-ico.grad {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  box-shadow: 0 6px 14px rgba(139, 92, 246, 0.28);
+}
+.w-ico.green {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.25);
+}
+.w-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.w-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 2px;
 }
 
-/* ---------- 对话页 ---------- */
-.chat-shell {
-  flex: 1;
-  min-height: 0;
+/* ── 底部导航 ── */
+.w-nav {
+  margin-top: 16px;
   display: flex;
-  flex-direction: column;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 30px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-}
-.chat-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 14px 22px;
-  border-bottom: 1px solid #eef2f7;
-  background: linear-gradient(180deg, #fbfcfe 0%, #fff 100%);
+  gap: 12px;
 }
-.chat-title {
+.w-nav-spacer { flex: 1; }
+.nav-text { margin: 0 4px; }
+.nav-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 切换动画 ── */
+.wizard-enter-active { transition: all 0.32s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)); }
+.wizard-leave-active { transition: all 0.18s ease; }
+.wizard-enter-from { opacity: 0; transform: translateY(18px) scale(0.99); }
+.wizard-leave-to { opacity: 0; transform: translateY(-10px) scale(0.99); }
+
+/* ── 表单 ── */
+.full { width: 100%; }
+.mode-group { margin-bottom: 4px; }
+.opt-meta { float: right; color: #c0c4cc; font-size: 12px; }
+
+/* ── 面试官卡片 ── */
+.interviewer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.iv-card {
+  background: #fff;
+  border: 1.5px solid #e4e9f2;
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.22s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.iv-card:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+}
+.iv-card.on {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.05);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+.iv-top {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #059669;
-  box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.5);
-  animation: livePulse 1.8s infinite;
+.iv-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
 }
-@keyframes livePulse {
-  70% {
-    box-shadow: 0 0 0 7px rgba(5, 150, 105, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(5, 150, 105, 0);
-  }
+.iv-info {
+  flex: 1;
+  min-width: 0;
 }
-.chat-title-text {
+.iv-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.iv-title {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+.iv-check {
+  color: #6366f1;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.iv-persona {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #64748b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.iv-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.iv-tag {
+  font-size: 11px;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.loading-text {
+  text-align: center;
+  color: #94a3b8;
+  padding: 30px 0;
+}
+
+/* ── 难度卡片 ── */
+.difficulty-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.diff-card {
+  background: #fff;
+  border: 1.5px solid #e4e9f2;
+  border-radius: 14px;
+  padding: 16px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.22s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.diff-card:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+.diff-card.on {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.06);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+}
+.diff-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.diff-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.55;
+}
+.rounds-form {
+  margin-top: 16px;
+}
+.start-summary {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: #f8fafc;
+  border: 1px dashed #dbe3ef;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+.sum-item {
+  font-size: 13px;
+  color: #64748b;
+}
+.sum-label {
+  margin-right: 6px;
+}
+.sum-item b {
+  color: #0f172a;
+}
+
+/* ── 对话区 ── */
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 132px);
+  min-height: 480px;
+  background: #fff;
+  border-radius: var(--app-radius-lg, 16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #eef1f6;
+}
+.chat-title {
   font-size: 15px;
   font-weight: 700;
   color: #0f172a;
 }
-.chat-rounds {
+.chat-sub {
   font-size: 12px;
   color: #94a3b8;
-  background: #f1f5f9;
-  padding: 2px 10px;
-  border-radius: 999px;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-
-.chat-box {
+.chat-dot { color: #cbd5e1; }
+.chat-body {
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
-  padding: 22px 22px 8px;
-  background: linear-gradient(180deg, #f8fafc 0%, #fdfefe 30%, #ffffff 100%);
-  scroll-behavior: smooth;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #fafbfe;
 }
-.chat-box::-webkit-scrollbar {
-  width: 6px;
-}
-.chat-box::-webkit-scrollbar-thumb {
-  background: #dbe3ee;
-  border-radius: 3px;
-}
-
-/* 消息 */
-.msg-row {
+.msg {
   display: flex;
   gap: 10px;
-  margin-bottom: 18px;
-  animation: fadeSlide 0.3s ease both;
+  max-width: 84%;
 }
-@keyframes fadeSlide {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.msg-user {
-  flex-direction: row-reverse;
+.msg.user {
+  align-self: flex-end;
+  justify-content: flex-end;
 }
 .msg-avatar {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
   color: #fff;
-  margin-top: 2px;
+  flex-shrink: 0;
 }
-.msg-assistant .msg-avatar {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+.ai-avatar {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
 }
-.msg-user .msg-avatar {
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
-}
-
-.bubble {
-  max-width: 76%;
-  padding: 12px 16px;
+.msg-bubble {
+  padding: 11px 14px;
   border-radius: 14px;
-  line-height: 1.7;
   font-size: 14px;
-  color: #1e293b;
-}
-.msg-assistant .bubble {
-  background: #fff;
-  border: 1px solid #e4ecfc;
-  border-top-left-radius: 4px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-.msg-user .bubble {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  color: #fff;
-  border-top-right-radius: 4px;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
-}
-.bubble-text {
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
 }
-
-/* 追问策略标签 */
-.strategy-tag {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 8px;
-  border-radius: 999px;
-  margin-bottom: 8px;
-  letter-spacing: 0.3px;
+.ai-bubble {
+  background: #fff;
+  border: 1px solid #eef1f6;
+  color: #1f2937;
+  border-top-left-radius: 4px;
 }
-.tag-opening {
-  color: #059669;
-  background: #ecfdf5;
+.user-bubble {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  border-top-right-radius: 4px;
 }
-.tag-deep_dive,
-.tag-project_probe {
-  color: #7c3aed;
-  background: #f3e8ff;
-}
-.tag-probe {
-  color: #2563eb;
-  background: #eff6ff;
-}
-.tag-remedy {
-  color: #d97706;
-  background: #fffbeb;
-}
-.tag-switch_topic {
-  color: #0891b2;
-  background: #ecfeff;
-}
-.tag-farewell {
-  color: #b45309;
-  background: #fef3c7;
-}
-.tag-none {
-  color: #64748b;
-  background: #f1f5f9;
-}
-
-/* 状态行：三点脉冲 */
-.status-line {
+.thinking {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: #64748b;
-  font-size: 13px;
-  padding: 6px 4px 14px;
+  gap: 5px;
 }
-.dots {
-  display: inline-flex;
-  gap: 4px;
-  padding: 6px 10px;
-  background: #fff;
-  border: 1px solid #e4ecfc;
-  border-radius: 999px;
-}
-.dots i {
-  width: 6px;
-  height: 6px;
+.tdot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #6366f1;
-  animation: dotPulse 1.2s ease-in-out infinite;
+  background: #94a3b8;
+  animation: tbounce 1.1s infinite ease-in-out;
 }
-.dots i:nth-child(2) {
-  animation-delay: 0.15s;
+.tdot:nth-child(2) { animation-delay: 0.15s; }
+.tdot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes tbounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
-.dots i:nth-child(3) {
-  animation-delay: 0.3s;
-}
-@keyframes dotPulse {
-  0%,
-  60%,
-  100% {
-    transform: scale(0.6);
-    opacity: 0.45;
-  }
-  30% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* 输入区 */
-.input-area {
+.chat-input {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  padding: 14px 22px 18px;
-  border-top: 1px solid #eef2f7;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid #eef1f6;
   background: #fff;
-}
-.input-area .el-input {
-  flex: 1;
-}
-.input-area :deep(.el-textarea__inner) {
-  border-radius: 12px;
-  border-color: #e2e8f0;
-  padding: 10px 14px;
-  font-size: 14px;
-  line-height: 1.6;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.input-area :deep(.el-textarea__inner:focus) {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 .send-btn {
-  min-width: 96px;
-  height: 44px;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), opacity 0.2s;
+}
+.send-btn:hover { transform: scale(1.04); }
+.send-btn:active { transform: scale(0.94); }
+.send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>

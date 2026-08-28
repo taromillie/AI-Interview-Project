@@ -1,17 +1,53 @@
 <template>
   <div class="diagnosis">
-    <el-alert
-      title="三步完成匹配诊断：① 保存简历（可保存多份，勾选用于诊断的一份）→ ② 粘贴或保存目标岗位 JD（可保存多份对比）→ ③ 查看匹配分、技能缺口与优化建议。简历解析与诊断由大模型完成，请确保已在「模型配置」页设置 API Key。"
-      type="info"
-      :closable="false"
-      class="tip"
-    />
+    <div class="page-banner">
+      <div class="banner-left">
+        <div class="banner-icon">
+          <el-icon :size="24"><Document /></el-icon>
+        </div>
+        <div>
+          <div class="banner-title">简历 × JD 诊断</div>
+          <div class="banner-desc">保存简历、粘贴目标岗位 JD，一键查看匹配分、技能缺口与优化建议</div>
+        </div>
+      </div>
+    </div>
 
-    <el-row :gutter="16">
-      <!-- 左侧：输入 -->
-      <el-col :span="12">
-        <el-card>
-          <template #header>① 上传简历</template>
+    <!-- 向导步骤条 -->
+    <div class="wizard">
+      <template v-for="(s, i) in wizardSteps" :key="s.id">
+        <button
+          class="w-step"
+          :class="{ active: currentStep === s.id, done: maxStep > s.id }"
+          :disabled="s.id > maxStep && s.id !== currentStep + 1"
+          @click="goStep(s.id)"
+        >
+          <span class="w-dot">
+            <el-icon v-if="maxStep > s.id" :size="14"><Check /></el-icon>
+            <template v-else>{{ s.id }}</template>
+          </span>
+          <span class="w-label">{{ s.title }}</span>
+        </button>
+        <span
+          v-if="i < wizardSteps.length - 1"
+          class="w-line"
+          :class="{ done: maxStep > wizardSteps[i].id }"
+        ></span>
+      </template>
+    </div>
+
+    <!-- 步骤内容 -->
+    <div class="w-body">
+      <transition name="wizard" mode="out-in">
+        <!-- ① 简历 -->
+        <section v-if="currentStep === 1" key="s1" class="w-card">
+          <div class="w-head">
+            <span class="w-ico"><el-icon :size="20"><Document /></el-icon></span>
+            <div>
+              <div class="w-title">上传你的简历</div>
+              <div class="w-desc">粘贴文本或上传文件，AI 会自动解析技能清单</div>
+            </div>
+          </div>
+
           <el-radio-group v-model="inputMode" class="mode-group">
             <el-radio-button value="paste">粘贴文本</el-radio-button>
             <el-radio-button value="file">上传文件</el-radio-button>
@@ -29,7 +65,7 @@
             v-if="inputMode === 'paste'"
             v-model="resumeText"
             type="textarea"
-            :rows="10"
+            :rows="8"
             placeholder="粘贴你的简历内容（教育背景、工作经历、项目、技能……）"
           />
           <el-upload
@@ -56,10 +92,7 @@
           <template v-if="resumes.length">
             <el-divider content-position="left">历史简历（{{ resumes.length }}）</el-divider>
             <div class="history-list">
-              <div
-                class="history-item"
-                :class="{ selected: selectedResumeId === null }"
-              >
+              <div class="history-item" :class="{ selected: selectedResumeId === null }">
                 <div class="history-main">
                   <div class="history-title">
                     最近一份简历
@@ -108,10 +141,18 @@
             </div>
           </template>
           <el-empty v-else description="保存简历后，可在历史列表中选择用于诊断的一份" :image-size="60" />
-        </el-card>
+        </section>
 
-        <el-card class="mt-16">
-          <template #header>② 岗位 JD（可保存多份对比）</template>
+        <!-- ② JD -->
+        <section v-else-if="currentStep === 2" key="s2" class="w-card">
+          <div class="w-head">
+            <span class="w-ico grad"><el-icon :size="20"><Search /></el-icon></span>
+            <div>
+              <div class="w-title">粘贴目标岗位 JD</div>
+              <div class="w-desc">粘贴 JD 内容或从历史中选择，系统将按它评估你的简历</div>
+            </div>
+          </div>
+
           <el-input
             v-model="jdTitle"
             placeholder="JD 标题（可选），如：后端开发工程师"
@@ -120,27 +161,12 @@
           <el-input
             v-model="jdText"
             type="textarea"
-            :rows="6"
+            :rows="8"
             placeholder="粘贴目标岗位 JD 内容（至少 20 字），例如：招聘后端开发工程师，要求熟练掌握 Python、MySQL、FastAPI……"
           />
-          <el-row :gutter="8" class="mt-8">
-            <el-col :span="12">
-              <el-button type="success" plain :loading="jdSaving" class="full" @click="saveJd">
-                {{ editingJdId ? '保存修改' : '保存 JD' }}
-              </el-button>
-            </el-col>
-            <el-col :span="12">
-              <el-button
-                type="primary"
-                :loading="diagnosing"
-                :disabled="!canDiagnose"
-                class="full"
-                @click="runDiagnose"
-              >
-                开始匹配诊断
-              </el-button>
-            </el-col>
-          </el-row>
+          <el-button type="success" plain :loading="jdSaving" class="action" @click="saveJd">
+            {{ editingJdId ? '保存修改' : '保存 JD' }}
+          </el-button>
 
           <template v-if="jds.length">
             <el-divider content-position="left">JD 历史（{{ jds.length }}）</el-divider>
@@ -169,13 +195,18 @@
               </div>
             </div>
           </template>
-        </el-card>
-      </el-col>
+          <el-empty v-else description="保存 JD 后可在历史中快速复用" :image-size="60" />
+        </section>
 
-      <!-- 右侧：结果 -->
-      <el-col :span="12">
-        <el-card>
-          <template #header>③ 诊断结果</template>
+        <!-- ③ 结果 -->
+        <section v-else key="s3" class="w-card">
+          <div class="w-head">
+            <span class="w-ico green"><el-icon :size="20"><DataAnalysis /></el-icon></span>
+            <div>
+              <div class="w-title">诊断结果</div>
+              <div class="w-desc">匹配分、技能缺口与优化建议</div>
+            </div>
+          </div>
 
           <template v-if="result">
             <div class="used-row">
@@ -190,7 +221,7 @@
                 type="dashboard"
                 :percentage="Math.round(result.match_score)"
                 :color="scoreColor(result.match_score)"
-                :width="130"
+                :width="140"
               >
                 <template #default>
                   <span class="score-num">{{ Math.round(result.match_score) }}</span>
@@ -224,20 +255,62 @@
             />
           </template>
 
-          <el-empty
-            v-else
-            description="选择简历与 JD 后，点击「开始匹配诊断」查看匹配结果"
-          />
-        </el-card>
-      </el-col>
-    </el-row>
+          <el-empty v-else description="正在等待诊断结果…" :image-size="80" />
+        </section>
+      </transition>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="w-nav">
+      <el-button v-if="currentStep > 1" size="large" @click="goPrev">
+        <el-icon><ArrowLeft /></el-icon>
+        <span class="nav-text">上一步</span>
+      </el-button>
+      <div class="w-nav-spacer"></div>
+      <template v-if="currentStep === 1">
+        <div class="nav-hint">保存简历后继续</div>
+        <el-button type="primary" size="large" @click="goNext">
+          下一步
+          <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+        </el-button>
+      </template>
+      <template v-else-if="currentStep === 2">
+        <div class="nav-hint" v-if="!canDiagnose">JD 内容至少 20 字</div>
+        <el-button
+          type="primary"
+          size="large"
+          :loading="diagnosing"
+          :disabled="!canDiagnose"
+          @click="goNext"
+        >
+          {{ diagnosing ? '正在诊断…' : '开始匹配诊断' }}
+          <el-icon v-if="!diagnosing" class="el-icon--right"><MagicStick /></el-icon>
+        </el-button>
+      </template>
+      <template v-else>
+        <el-button size="large" @click="goPrev">
+          <el-icon><RefreshLeft /></el-icon>
+          <span class="nav-text">换个 JD 重新诊断</span>
+        </el-button>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  DataAnalysis,
+  Document,
+  MagicStick,
+  RefreshLeft,
+  Search,
+  UploadFilled,
+} from '@element-plus/icons-vue'
 import {
   createJd,
   deleteJd,
@@ -269,7 +342,47 @@ const jds = ref([])
 const editingJdId = ref(null)
 const selectedJdId = ref(null) // null = 使用当前输入
 
+// ── 向导状态 ──
+const wizardSteps = [
+  { id: 1, title: '上传简历' },
+  { id: 2, title: '粘贴 JD' },
+  { id: 3, title: '查看结果' },
+]
+const currentStep = ref(1) // 当前展示哪一步
+const maxStep = ref(1) // 到达过的最深步骤（决定步骤条"已完成"态）
+
 const canDiagnose = computed(() => !!selectedJdId.value || jdText.value.trim().length >= 20)
+
+function goPrev() {
+  if (currentStep.value === 3 && result.value) {
+    // 结果页"返回"= 回 JD 步骤重新调整
+    currentStep.value = 2
+    return
+  }
+  if (currentStep.value > 1) currentStep.value--
+}
+
+function goNext() {
+  if (currentStep.value === 1) {
+    if (!resumes.value.length) {
+      ElMessage.warning('请先保存一份简历，再进行下一步')
+      return
+    }
+    currentStep.value = 2
+    maxStep.value = Math.max(maxStep.value, 2)
+  } else if (currentStep.value === 2) {
+    runDiagnose()
+  }
+}
+
+function goStep(n) {
+  if (n === currentStep.value) return
+  // 只允许跳转：已完成步骤，或紧邻的下一步
+  if (n <= maxStep.value || n === currentStep.value + 1) {
+    if (n === currentStep.value + 1) goNext()
+    else currentStep.value = n
+  }
+}
 
 function onFileChange(uploadFile) {
   file.value = uploadFile.raw
@@ -449,6 +562,8 @@ async function runDiagnose() {
       resume_id: selectedResumeId.value,
       jd_id: selectedJdId.value,
     })
+    currentStep.value = 3
+    maxStep.value = 3
     ElMessage.success('匹配诊断完成')
   } finally {
     diagnosing.value = false
@@ -488,9 +603,172 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.tip {
-  margin-bottom: 16px;
+/* ── 向导步骤条 ── */
+.wizard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 880px;
+  margin: 0 auto 20px;
+  padding: 18px 28px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
 }
+.w-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.w-step:active {
+  transform: scale(0.96);
+}
+.w-step:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.w-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.w-step.active .w-dot {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+.w-step.done .w-dot {
+  color: #fff;
+  background: #10b981;
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.14);
+}
+.w-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  transition: color 0.25s ease;
+}
+.w-step.active .w-label {
+  color: #2563eb;
+}
+.w-step.done .w-label {
+  color: #0f172a;
+}
+.w-line {
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  margin: 0 12px;
+  transition: background 0.3s ease;
+}
+.w-line.done {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+/* ── 步骤卡片 ── */
+.w-body {
+  max-width: 880px;
+  margin: 0 auto;
+}
+.w-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--app-radius-lg, 16px);
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  padding: 26px 30px 30px;
+}
+.w-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.w-ico {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+}
+.w-ico.grad {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  box-shadow: 0 6px 14px rgba(139, 92, 246, 0.28);
+}
+.w-ico.green {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.25);
+}
+.w-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.w-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+/* ── 底部导航 ── */
+.w-nav {
+  max-width: 880px;
+  margin: 18px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.w-nav-spacer {
+  flex: 1;
+}
+.nav-text {
+  margin: 0 4px;
+}
+.nav-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ── 切换动画 ── */
+.wizard-enter-active {
+  transition: all 0.32s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.wizard-leave-active {
+  transition: all 0.18s ease;
+}
+.wizard-enter-from {
+  opacity: 0;
+  transform: translateY(18px) scale(0.99);
+}
+.wizard-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
+}
+
+/* ── 原有表单/结果样式 ── */
 .mode-group {
   margin-bottom: 14px;
 }
@@ -501,12 +779,6 @@ onMounted(() => {
   margin-top: 14px;
   width: 100%;
 }
-.mt-16 {
-  margin-top: 16px;
-}
-.mt-8 {
-  margin-top: 10px;
-}
 .mb-8 {
   margin-bottom: 10px;
 }
@@ -516,11 +788,11 @@ onMounted(() => {
 .score-row {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 28px;
   padding: 8px 0 16px;
 }
 .score-num {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 700;
 }
 .score-title {
@@ -563,55 +835,56 @@ onMounted(() => {
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  transition: all 0.2s;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    border-color 0.2s ease, background-color 0.2s ease;
+}
+.history-item:hover {
+  border-color: var(--app-brand, #2563eb);
+  background: rgba(37, 99, 235, 0.04);
 }
 .history-item.selected {
-  border-color: #67c23a;
-  background: #f0f9eb;
-}
-.history-item.active {
-  border-color: #409eff;
-  background: #ecf5ff;
+  border-color: var(--app-brand, #2563eb);
+  background: rgba(37, 99, 235, 0.06);
 }
 .history-main {
   flex: 1;
   min-width: 0;
 }
 .history-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #303133;
-  margin-bottom: 6px;
-}
-.selected-tag {
-  margin-left: 6px;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .history-meta {
   font-size: 12px;
   color: #909399;
-  margin-bottom: 4px;
+  margin-top: 4px;
+}
+.history-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
 }
 .history-hint {
   font-size: 12px;
   color: #909399;
+  margin-top: 4px;
 }
 .history-preview {
   font-size: 12px;
-  color: #606266;
-  white-space: nowrap;
+  color: #909399;
+  margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 360px;
-}
-.history-skills {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.skill-tag {
-  margin-right: 0;
+  white-space: nowrap;
+  max-width: 420px;
 }
 .more {
   font-size: 12px;
