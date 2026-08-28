@@ -23,6 +23,16 @@
         <el-select v-model="positionId" clearable placeholder="全部岗位" style="width: 200px" @change="loadAtoms">
           <el-option v-for="p in positions" :key="p.id" :label="positionLabel(p)" :value="p.id" />
         </el-select>
+        <el-input
+          v-model="keyword"
+          clearable
+          placeholder="搜索题目 / 标签关键词"
+          style="width: 220px"
+          class="keyword-input"
+          @keyup.enter="loadAtoms"
+          @clear="loadAtoms"
+        />
+        <el-button @click="loadAtoms">搜索</el-button>
         <el-select v-model="status" clearable placeholder="全部状态" style="width: 140px" @change="loadAtoms">
           <el-option label="草稿" value="draft" />
           <el-option label="已发布" value="published" />
@@ -117,6 +127,7 @@
 <script setup>
 import { Collection } from '@element-plus/icons-vue'
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { createAtom, listAtoms, listPositions, publishAtom } from '@/api/question'
 
@@ -158,6 +169,7 @@ async function loadAtoms() {
     const params = {}
     if (positionId.value) params.position_id = positionId.value
     if (status.value) params.status = status.value
+    if (keyword.value.trim()) params.keyword = keyword.value.trim()
     atoms.value = await listAtoms(params)
   } finally {
     loading.value = false

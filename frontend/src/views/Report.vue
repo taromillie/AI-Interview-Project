@@ -103,10 +103,16 @@
                   :key="i"
                   type="danger"
                   effect="plain"
-                  class="cov-tag"
+                  class="cov-tag clickable"
+                  :title="`去题库练习：${u}`"
+                  @click="goPractice(u)"
                 >
                   {{ u }}
                 </el-tag>
+                <div v-if="(report.coverage.uncovered || []).length" class="cov-hint">
+                  <el-icon><Pointer /></el-icon>
+                  点击上方知识点可直达题库练习
+                </div>
                 <el-empty v-if="!(report.coverage.uncovered || []).length" description="暂无" :image-size="40" />
               </div>
             </el-col>
@@ -152,7 +158,7 @@
 </template>
 
 <script setup>
-import { DataAnalysis, Plus } from '@element-plus/icons-vue'
+import { DataAnalysis, Plus, Pointer } from '@element-plus/icons-vue'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getReport } from '@/api/report'
@@ -164,6 +170,10 @@ const DIMS = { tech: '技术能力', expression: '表达沟通', logic: '逻辑�
 
 const loading = ref(false)
 const report = ref(null)
+
+function goPractice(knowledge) {
+  router.push({ path: '/question-bank', query: { keyword: knowledge } })
+}
 
 function scoreColor(s) {
   if (s >= 80) return '#67c23a'
@@ -230,6 +240,22 @@ onMounted(load)
 .cov-block.covered {
   background: #f0f9eb;
   border: 1px solid #e1f3d8;
+}
+.cov-tag.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cov-tag.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+.cov-hint {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--app-text-muted);
+  font-size: 12px;
 }
 .cov-block.uncovered {
   background: #fef0f0;

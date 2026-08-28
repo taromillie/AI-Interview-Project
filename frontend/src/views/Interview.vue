@@ -208,7 +208,17 @@
             <span>第 {{ chatMessages.filter((m) => m.role === 'ai').length }}/{{ maxRounds }} 轮</span>
           </div>
         </div>
-        <el-button size="small" @click="endEarly">结束面试</el-button>
+        <div class="chat-tools">
+          <button
+            class="tool-btn"
+            :class="{ on: voiceEnabled }"
+            :title="voiceEnabled ? '关闭语音播报' : '开启语音播报'"
+            @click="toggleVoice"
+          >
+            <el-icon :size="16"><Bell v-if="voiceEnabled" /><BellFilled v-else /></el-icon>
+          </button>
+          <el-button size="small" @click="endEarly">结束面试</el-button>
+        </div>
       </div>
 
       <div ref="chatBody" class="chat-body">
@@ -230,12 +240,22 @@
       </div>
 
       <div class="chat-input">
+        <button
+          v-if="micSupported"
+          class="mic-btn"
+          :class="{ on: recording }"
+          :disabled="!waitingAnswer"
+          :title="recording ? '停止语音输入' : '语音输入回答'"
+          @click="toggleRecording"
+        >
+          <el-icon :size="18"><Microphone /></el-icon>
+        </button>
         <el-input
           v-model="answerDraft"
           type="textarea"
           :rows="2"
           :disabled="!waitingAnswer"
-          :placeholder="waitingAnswer ? '输入你的回答，Enter 发送，Shift+Enter 换行' : '面试官正在提问…'"
+          :placeholder="recording ? '正在聆听你的回答…' : (waitingAnswer ? '输入你的回答，Enter 发送，Shift+Enter 换行' : '面试官正在提问…')"
           resize="none"
           @keydown.enter.exact.prevent="sendAnswer"
         />
@@ -248,16 +268,19 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   ArrowLeft,
   ArrowRight,
+  Bell,
+  BellFilled,
   Check,
   DataAnalysis,
   Aim,
   MagicStick,
+  Microphone,
   Promotion,
   User,
 } from '@element-plus/icons-vue'
@@ -304,7 +327,15 @@ const waitingAnswer = ref(false)
 const answerDraft = ref('')
 const interviewId = ref(null)
 const chatBody = ref(null)
-const canUseVoice = false
+
+// ── 语音面试（Web Speech API）──
+const voiceEnabled = ref(true)
+const micSupported = typeof window !== 'undefined' && (
+  'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
+)
+const recording = ref(false)
+let finalTranscript = ''
+let recognition = null
 
 // ── 派生 ──
 const positionLabel = computed(() => {
@@ -416,6 +447,7 @@ async function beginChat() {
       onEvent: (event, data) => {
         if (event === 'question') {
           chatMessages.value.push({ role: 'ai', content: data?.question })
+          speakText(data?.question)
         } else if (event === 'finished') {
           waitingAnswer.value = false
         }
@@ -432,7 +464,86 @@ async function beginChat() {
   scrollToBottom()
 }
 
+// ── 语音播报 ──
+function speakText(text) {
+  if (!voiceEnabled.value || !text) return
+  if (!('speechSynthesis' in window)) return
+  stopSpeak()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'zh-CN'
+  u.rate = 1.05
+  window.speechSynthesis.speak(u)
+}
+
+function stopSpeak() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+}
+
+function toggleVoice() {
+  voiceEnabled.value = !voiceEnabled.value
+  if (!voiceEnabled.value) stopSpeak()
+}
+
+// ── 语音输入 ──
+function getRecognition() {
+  if (recognition) return recognition
+  const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition
+  if (!Ctor) return null
+  const r = new Ctor()
+  r.lang = 'zh-CN'
+  r.continuous = true
+  r.interimResults = true
+  r.onresult = (e) => {
+    let interim = ''
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i]
+      if (res.isFinal) finalTranscript += res[0].transcript
+      else interim += res[0].transcript
+    }
+    answerDraft.value = (finalTranscript + interim).trimStart()
+  }
+  r.onerror = () => {
+    recording.value = false
+  }
+  r.onend = () => {
+    if (recording.value) {
+      try { r.start() } catch { recording.value = false }
+    }
+  }
+  recognition = r
+  return r
+}
+
+function stopRecording() {
+  if (!recording.value) return
+  recording.value = false
+  if (recognition) {
+    try { recognition.stop() } catch { /* 忽略 */ }
+  }
+}
+
+function toggleRecording() {
+  if (!micSupported || !waitingAnswer.value) return
+  const r = getRecognition()
+  if (!r) {
+    ElMessage.warning('当前浏览器不支持语音输入，请使用 Chrome / Edge')
+    return
+  }
+  if (recording.value) {
+    stopRecording()
+  } else {
+    finalTranscript = ''
+    answerDraft.value = ''
+    recording.value = true
+    try { r.start() } catch {
+      recording.value = false
+      ElMessage.warning('无法启动麦克风，请检查浏览器权限')
+    }
+  }
+}
+
 async function sendAnswer() {
+  stopRecording()
   const content = answerDraft.value.trim()
   if (!content || !waitingAnswer.value) return
   chatMessages.value.push({ role: 'user', content })
@@ -445,6 +556,7 @@ async function sendAnswer() {
       onEvent: (event, data) => {
         if (event === 'question') {
           chatMessages.value.push({ role: 'ai', content: data?.question })
+          speakText(data?.question)
           waitingAnswer.value = true
         } else if (event === 'finished') {
           const detail = data || {}
@@ -496,6 +608,13 @@ function applyQueryParams() {
 }
 
 watch(currentStep, scrollToBottom)
+
+onUnmounted(() => {
+  stopSpeak()
+  if (recognition) {
+    try { recognition.abort() } catch { /* 忽略 */ }
+  }
+})
 
 onMounted(async () => {
   try {
@@ -847,6 +966,52 @@ onMounted(async () => {
   justify-content: space-between;
   padding: 14px 20px;
   border-bottom: 1px solid var(--app-border);
+}
+.chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tool-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--app-border);
+  background: #fff;
+  cursor: pointer;
+  color: var(--app-text-muted);
+  transition: all 0.2s ease;
+}
+.tool-btn:hover { border-color: #1a1a1a; color: #1a1a1a; }
+.tool-btn.on { color: #fff; background: #1a1a1a; border-color: #1a1a1a; }
+.mic-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--app-border);
+  background: #fff;
+  cursor: pointer;
+  color: var(--app-text-secondary);
+  transition: all 0.2s ease;
+}
+.mic-btn:hover:not(:disabled) { border-color: #1a1a1a; color: #1a1a1a; }
+.mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mic-btn.on {
+  color: #fff;
+  background: #ef4444;
+  border-color: #ef4444;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 .chat-title {
   font-size: 15px;

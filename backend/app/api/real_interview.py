@@ -1,10 +1,11 @@
 """真实面试复盘接口（Phase 3，FR-D-03）。"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
+from app.core.rate_limit import limiter
 from app.models.real_interview import RealInterview, RealInterviewItem
 from app.models.user import User
 from app.schemas.real_interview import (
@@ -58,7 +59,9 @@ def create_real_interview(
 
 
 @router.post("/{interview_id}/review", response_model=RealInterviewOut)
+@limiter.limit("20/minute")
 async def review_interview(
+    request: Request,
     interview_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

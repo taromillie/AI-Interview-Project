@@ -1,10 +1,11 @@
 """转行诊断接口（Phase 2）。"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
+from app.core.rate_limit import limiter
 from app.models.career import CareerPlan
 from app.models.resume import Resume
 from app.models.user import User
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/career", tags=["转行诊断"])
 
 
 @router.post("/diagnosis", response_model=CareerDiagnosisOut)
+@limiter.limit("20/minute")
 async def career_diagnosis(
+    request: Request,
     payload: CareerDiagnosisRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

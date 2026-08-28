@@ -8,7 +8,7 @@ SSE 事件协议：
 """
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.core.exceptions import AppError
+from app.core.rate_limit import limiter
 from app.models.interview import Interview, InterviewMessage, Report
 from app.models.interviewer import Interviewer
 from app.models.position import Position
@@ -76,7 +77,9 @@ def _make_out(db: Session, interview: Interview) -> InterviewOut:
 
 
 @router.post("", response_model=InterviewOut, status_code=201)
+@limiter.limit("20/minute")
 def create_interview(
+    request: Request,
     payload: InterviewCreateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -134,7 +137,9 @@ def _sse(result):
 
 
 @router.post("/{interview_id}/start")
+@limiter.limit("30/minute")
 async def start_interview(
+    request: Request,
     interview_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -159,7 +164,9 @@ async def start_interview(
 
 
 @router.post("/{interview_id}/answer")
+@limiter.limit("30/minute")
 async def submit_answer(
+    request: Request,
     interview_id: int,
     payload: AnswerRequest,
     user: User = Depends(get_current_user),
@@ -193,7 +200,9 @@ async def submit_answer(
 
 
 @router.post("/{interview_id}/finish")
+@limiter.limit("30/minute")
 async def finish_interview(
+    request: Request,
     interview_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

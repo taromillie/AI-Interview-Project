@@ -1,10 +1,11 @@
 """简历上传与简历×JD 匹配诊断接口（Phase 1）。"""
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
+from app.core.rate_limit import limiter
 from app.models.resume import JobDescription, MatchDiagnostic, Resume
 from app.models.user import User
 from app.schemas.diagnostic import ResumeDiagnosticOut, ResumeDiagnosticRequest, ResumeOut
@@ -32,7 +33,9 @@ def _auto_name(parsed: dict) -> str:
 
 
 @router.post("/upload", response_model=ResumeOut)
+@limiter.limit("20/minute")
 async def upload_resume(
+    request: Request,
     file: UploadFile | None = File(default=None),
     raw_text: str | None = Form(default=None),
     name: str | None = Form(default=None, description="自定义简历名称，留空自动命名"),
@@ -86,7 +89,9 @@ def delete_resume(
 
 
 @router.post("/diagnose", response_model=ResumeDiagnosticOut)
+@limiter.limit("20/minute")
 async def diagnose(
+    request: Request,
     payload: ResumeDiagnosticRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

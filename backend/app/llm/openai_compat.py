@@ -1,9 +1,13 @@
 """OpenAI 兼容接口实现（覆盖 DeepSeek/Kimi/GLM/Qwen 等）。"""
+import logging
+import time
 from typing import AsyncIterator
 
 from langchain_openai import ChatOpenAI
 
 from app.llm.base import ChatMessage, LLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAICompatProvider(LLMProvider):
@@ -33,10 +37,17 @@ class OpenAICompatProvider(LLMProvider):
         temperature: float = 0.3,
         max_tokens: int = 2048,
     ) -> str:
+        t0 = time.perf_counter()
         resp = await self._client.ainvoke(
             self._to_langchain(messages),
             temperature=temperature,
             max_tokens=max_tokens,
+        )
+        logger.info(
+            "LLM achat model=%s msgs=%d dur=%.2fs",
+            self._model,
+            len(messages),
+            time.perf_counter() - t0,
         )
         return resp.content
 
@@ -56,14 +67,23 @@ class OpenAICompatProvider(LLMProvider):
         )
 
         async def _gen():
-            async for chunk in stream:
-                if isinstance(chunk, AIMessageChunk):
-                    yield chunk.content or ""
-                elif isinstance(chunk, dict):
-                    yield chunk.get("content", "") or ""
-                else:
-                    text = getattr(chunk, "content", "")
-                    if text:
-                        yield text
+            t0 = time.perf_counter()
+            try:
+                async for chunk in stream:
+                    if isinstance(chunk, AIMessageChunk):
+                        yield chunk.content or ""
+                    elif isinstance(chunk, dict):
+                        yield chunk.get("content", "") or ""
+                    else:
+                        text = getattr(chunk, "content", "")
+                        if text:
+                            yield text
+            finally:
+                logger.info(
+                    "LLM stream model=%s msgs=%d dur=%.2fs",
+                    self._model,
+                    len(messages),
+                    time.perf_counter() - t0,
+                )
 
         return _gen()

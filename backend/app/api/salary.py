@@ -1,10 +1,11 @@
 """谈薪评估接口（Phase 2）。"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
+from app.core.rate_limit import limiter
 from app.models.career import SalaryEval
 from app.models.resume import Resume
 from app.models.user import User
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/salary", tags=["谈薪评估"])
 
 
 @router.post("/evaluate", response_model=SalaryEvalOut)
+@limiter.limit("20/minute")
 async def evaluate_salary(
+    request: Request,
     payload: SalaryEvalRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

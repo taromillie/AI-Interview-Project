@@ -1,6 +1,6 @@
 """题库管理接口（知识原子 CRUD，ADMIN 发布）。"""
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, or_, select
+from sqlalchemy import String, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin
@@ -120,6 +120,7 @@ def _seed_builtin_positions(db: Session) -> None:
 def list_atoms(
     position_id: int | None = None,
     status: str | None = Query(default=None, pattern="^(draft|published|archived)$"),
+    keyword: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -127,6 +128,14 @@ def list_atoms(
     stmt = select(KnowledgeAtom)
     if position_id:
         stmt = stmt.where(KnowledgeAtom.position_id == position_id)
+    if keyword:
+        kw = f"%{keyword.strip()}%"
+        stmt = stmt.where(
+            or_(
+                KnowledgeAtom.question.ilike(kw),
+                func.cast(KnowledgeAtom.tags, String).ilike(kw),
+            )
+        )
     if user.role == "admin":
         if status:
             stmt = stmt.where(KnowledgeAtom.status == status)

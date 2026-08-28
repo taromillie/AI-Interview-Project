@@ -21,7 +21,7 @@
           </button>
         </form>
         <div class="chips">
-          <button v-for="c in chips" :key="c.text" class="chip" @click="useChip(c)">
+          <button v-for="c in chips" :key="c.text" type="button" class="chip" @click="useChip(c)">
             {{ c.text }}
           </button>
         </div>

@@ -4,12 +4,16 @@ import threading
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from starlette.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.db import SessionLocal, init_db
 from app.core.exceptions import register_exception_handlers
+from app.core.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,42 @@ app.add_middleware(
 )
 
 register_exception_handlers(app)
+
+# 限流：绑定到 app 并提供统一的 429 响应
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "请求过于频繁，请稍后再试",
+            "limit": str(exc.detail) if exc.detail else "rate limit exceeded",
+        },
+    )
+
+
+@app.middleware("http")
+async def request_logging(request: Request, call_next):
+    """结构化请求日志：方法、路径、状态码、耗时、客户端 IP。"""
+    if not request.url.path.startswith("/api"):
+        return await call_next(request)
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s -> %s (%.1fms, ip=%s)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+        request.client.host if request.client else "-",
+    )
+    return response
+
+
+app.add_middleware(SlowAPIMiddleware)
 
 
 @app.get("/health", tags=["system"])
