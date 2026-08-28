@@ -300,6 +300,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/time'
 import {
   ArrowLeft,
   ArrowRight,
@@ -480,11 +481,7 @@ watch(jdText, (v) => {
 })
 
 function formatTime(dt) {
-  if (!dt) return ''
-  const d = new Date(dt)
-  if (Number.isNaN(d.getTime())) return String(dt)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(dt)
 }
 
 async function saveResume() {

@@ -138,6 +138,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getInterviewDetail, listInterviews } from '@/api/interview'
+import { formatDateTime } from '@/utils/time'
 
 const router = useRouter()
 const interviews = ref([])
@@ -156,9 +157,7 @@ const drawerTitle = computed(() => {
 })
 
 function formatTime(s) {
-  if (!s) return ''
-  const d = new Date(s)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return formatDateTime(s)
 }
 
 function statusText(s) {

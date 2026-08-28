@@ -308,6 +308,7 @@ import {
 } from '@element-plus/icons-vue'
 import { careerDiagnosis, listCareerPlans } from '@/api/career'
 import { listResumes } from '@/api/diagnostic'
+import { formatDateTime } from '@/utils/time'
 
 const wizardSteps = [
   { id: 1, title: '当前岗位' },
@@ -407,11 +408,7 @@ async function loadPlans() {
 }
 
 function formatTime(dt) {
-  if (!dt) return ''
-  const d = new Date(dt)
-  if (Number.isNaN(d.getTime())) return String(dt)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(dt)
 }
 
 function levelTag(level) {

@@ -21,7 +21,7 @@
 
       <div class="filters">
         <el-select v-model="positionId" clearable placeholder="全部岗位" style="width: 200px" @change="loadAtoms">
-          <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id" />
+          <el-option v-for="p in positions" :key="p.id" :label="positionLabel(p)" :value="p.id" />
         </el-select>
         <el-select v-model="status" clearable placeholder="全部状态" style="width: 140px" @change="loadAtoms">
           <el-option label="草稿" value="draft" />
@@ -86,7 +86,7 @@
       <el-form :model="form" label-width="90px">
         <el-form-item label="所属岗位">
           <el-select v-model="form.position_id" placeholder="选择岗位" style="width: 100%">
-            <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id" />
+            <el-option v-for="p in positions" :key="p.id" :label="positionLabel(p)" :value="p.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="题目">
@@ -127,6 +127,10 @@ const STATUS_TYPE = { draft: 'info', published: 'success', archived: 'warning' }
 const positions = ref([])
 const atoms = ref([])
 const positionId = ref(null)
+
+function positionLabel(p) {
+  return p.company ? `${p.company} ${p.name}` : p.name
+}
 const status = ref(null)
 const loading = ref(false)
 const saving = ref(false)

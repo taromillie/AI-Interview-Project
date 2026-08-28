@@ -256,6 +256,7 @@ import {
   RefreshLeft,
 } from '@element-plus/icons-vue'
 import { listResumes } from '@/api/diagnostic'
+import { formatDateTime } from '@/utils/time'
 import {
   deleteStudyPlan,
   generateStudyPlan,
@@ -379,11 +380,7 @@ async function removePlan() {
 }
 
 function formatTime(dt) {
-  if (!dt) return ''
-  const d = new Date(dt)
-  if (Number.isNaN(d.getTime())) return String(dt)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(dt)
 }
 
 onMounted(() => {

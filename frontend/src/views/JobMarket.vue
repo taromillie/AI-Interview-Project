@@ -68,7 +68,7 @@
     <div v-if="filtered.length" class="job-grid">
       <div v-for="j in filtered" :key="j.id" class="job-card" @click="openDetail(j)">
         <div class="job-head">
-          <div class="job-name">{{ j.name }}</div>
+          <div class="job-name">{{ j.company || '未标注公司' }}</div>
           <div class="job-tags">
             <el-tag size="small" effect="plain">{{ directionText(j.direction) }}</el-tag>
             <el-tag size="small" :type="difficultyType(j.difficulty)" effect="light">
@@ -76,7 +76,7 @@
             </el-tag>
           </div>
         </div>
-        <div class="job-company">{{ j.company || '未标注公司' }}</div>
+        <div class="job-position">{{ j.name }}</div>
         <div class="job-meta">
           <span v-if="j.city" class="meta-chip"><el-icon :size="12"><Location /></el-icon>{{ j.city }}</span>
           <span class="meta-chip salary" :class="{ off: !salaryText(j) }">
@@ -113,9 +113,9 @@
         <div class="modal">
           <div class="modal-head">
             <div>
-              <div class="modal-name">{{ detail.name }}</div>
+              <div class="modal-name">{{ detail.company || detail.name }}</div>
               <div class="modal-sub">
-                <span v-if="detail.company">{{ detail.company }}</span>
+                <span>{{ detail.name }}</span>
                 <span v-if="detail.city" class="dot">·</span>
                 <span v-if="detail.city">{{ detail.city }}</span>
                 <span class="dot">·</span>
@@ -203,6 +203,7 @@ import { useRouter } from 'vue-router'
 import { Close, Location, MagicStick, Refresh, Search, Wallet, Clock, ArrowRight, Link, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { listPositions, syncPositions, getSyncConfig, updateSyncConfig } from '@/api/question'
+import { formatDate, parseDate } from '@/utils/time'
 
 const router = useRouter()
 const positions = ref([])
@@ -248,10 +249,11 @@ const filtered = computed(() => {
 const updatedAgo = computed(() => {
   let latest = null
   for (const j of positions.value) {
-    if (j.synced_at && (!latest || new Date(j.synced_at) > new Date(latest))) latest = j.synced_at
+    const t = parseDate(j.synced_at)
+    if (t && (!latest || t.getTime() > latest.getTime())) latest = t
   }
   if (!latest) return '暂无'
-  const diff = (Date.now() - new Date(latest).getTime()) / 1000
+  const diff = (Date.now() - latest.getTime()) / 1000
   if (diff < 60) return '刚刚'
   if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
@@ -280,8 +282,7 @@ function salaryText(j) {
   return ''
 }
 function fmtDate(v) {
-  if (!v) return ''
-  return new Date(v).toLocaleDateString('zh-CN')
+  return formatDate(v)
 }
 
 function applyFilter() {}
@@ -594,7 +595,8 @@ onUnmounted(() => {
   gap: 4px;
   flex-shrink: 0;
 }
-.job-company {
+.job-position {
+  margin-top: 4px;
   font-size: 13px;
   color: var(--app-text-secondary);
   font-weight: 600;

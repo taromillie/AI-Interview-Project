@@ -249,6 +249,7 @@
 import { TrendCharts } from '@element-plus/icons-vue'
 import { computed, onMounted, ref } from 'vue'
 import { getProfile } from '@/api/profile'
+import { shortDate } from '@/utils/time'
 
 const size = 420
 const cx = size / 2
@@ -293,11 +294,7 @@ function trendPath(key) {
   return data.map((d, i) => `${i ? 'L' : 'M'}${tx(i)},${ty(d.dimensions?.[key])}`).join(' ')
 }
 
-function shortDate(s) {
-  if (!s) return ''
-  const d = new Date(s)
-  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+
 
 function point(i, ratio) {
   const angle = (i / dims.length) * Math.PI * 2 - Math.PI / 2

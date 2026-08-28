@@ -58,8 +58,9 @@
                   placeholder="从岗位库选择（支持关键词搜索）"
                   class="full"
                 >
-                  <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id">
-                    <span>{{ p.name }}</span>
+                  <el-option v-for="p in positions" :key="p.id" :label="positionOptionLabel(p)" :value="p.id">
+                    <span class="opt-company">{{ p.company || '未知公司' }}</span>
+                    <span class="opt-position">{{ p.name }}</span>
                     <span class="opt-meta">{{ positionMeta(p) }}</span>
                   </el-option>
                 </el-select>
@@ -309,10 +310,14 @@ const canUseVoice = false
 const positionLabel = computed(() => {
   if (positionMode.value === 'preset') {
     const p = positions.value.find((x) => x.id === selectedPositionId.value)
-    return p ? p.name : ''
+    return p ? positionOptionLabel(p) : ''
   }
   return customPosition.value.trim() || ''
 })
+
+function positionOptionLabel(p) {
+  return p.company ? `${p.company} ${p.name}` : p.name
+}
 
 const canNext = computed(() => {
   if (currentStep.value === 1) return !!positionLabel.value
@@ -332,7 +337,7 @@ const difficultyLabel = computed(() => {
 
 const sessionPositionLabel = computed(() => {
   const p = positions.value.find((x) => x.id === selectedPositionId.value)
-  return p ? p.name : (customPosition.value.trim() || '模拟面试')
+  return p ? positionOptionLabel(p) : (customPosition.value.trim() || '模拟面试')
 })
 
 function positionMeta(p) {
@@ -408,10 +413,10 @@ async function beginChat() {
   waitingAnswer.value = true
   try {
     await startInterview(interviewId.value, {
-      onEvent: (ev) => {
-        if (ev.type === 'question') {
-          chatMessages.value.push({ role: 'ai', content: ev.data?.content || ev.data })
-        } else if (ev.type === 'finished') {
+      onEvent: (event, data) => {
+        if (event === 'question') {
+          chatMessages.value.push({ role: 'ai', content: data?.question })
+        } else if (event === 'finished') {
           waitingAnswer.value = false
         }
       },
@@ -437,16 +442,14 @@ async function sendAnswer() {
   scrollToBottom()
   try {
     await answerInterview(interviewId.value, content, {
-      onEvent: (ev) => {
-        if (ev.type === 'question') {
-          chatMessages.value.push({ role: 'ai', content: ev.data?.content || ev.data })
+      onEvent: (event, data) => {
+        if (event === 'question') {
+          chatMessages.value.push({ role: 'ai', content: data?.question })
           waitingAnswer.value = true
-        } else if (ev.type === 'finished') {
-          const detail = ev.data || {}
+        } else if (event === 'finished') {
+          const detail = data || {}
           ElMessage.success(detail.analysis ? '面试完成，报告已生成' : '面试结束')
           waitingAnswer.value = false
-        } else if (ev.type === 'error') {
-          ElMessage.error(ev.data?.detail || '面试出错')
         }
       },
     })
@@ -675,6 +678,8 @@ onMounted(async () => {
 /* ── 表单 ── */
 .full { width: 100%; }
 .mode-group { margin-bottom: 4px; }
+.opt-company { color: #303133; font-weight: 600; font-size: 13px; }
+.opt-position { margin-left: 8px; color: #909399; font-size: 12px; }
 .opt-meta { float: right; color: #c0c4cc; font-size: 12px; }
 
 /* ── 面试官卡片 ── */

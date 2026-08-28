@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
     <header class="top-nav">
-      <router-link to="/" class="wordmark">
+      <router-link to="/dashboard" class="wordmark">
         <span class="wordmark-mark">M</span>
         <span class="wordmark-text">AI 面试官</span>
       </router-link>
@@ -71,7 +71,7 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const primaryLinks = [
-  { path: '/', label: '首页' },
+  { path: '/dashboard', label: '首页' },
   { path: '/jobs', label: '岗位广场' },
   { path: '/interview', label: '模拟面试' },
   { path: '/history', label: '面试记录' },
@@ -94,7 +94,6 @@ const isMoreActive = computed(() =>
 )
 
 function isActive(item) {
-  if (item.path === '/') return route.path === '/'
   return route.path.startsWith(item.path)
 }
 

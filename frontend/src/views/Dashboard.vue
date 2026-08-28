@@ -43,7 +43,8 @@
       </div>
       <div class="job-grid">
         <div v-for="j in hotJobs" :key="j.id" class="job-card" @click="startByJob(j)">
-          <div class="job-name">{{ j.name }}</div>
+          <div class="job-name">{{ j.company || j.name }}</div>
+          <div class="job-position">{{ j.name }}</div>
           <div class="job-meta">
             <span>{{ directionText(j.direction) }}</span>
             <span class="dot-sep">·</span>
@@ -147,21 +148,26 @@ function difficultyText(d) {
 }
 
 const fallbackJobs = [
-  { id: 1, name: 'Java 开发工程师', direction: 'backend', difficulty: 'mid', skills: ['Java', 'Spring Boot', 'MySQL'] },
-  { id: 2, name: '前端开发工程师', direction: 'frontend', difficulty: 'mid', skills: ['Vue', 'React', 'TypeScript'] },
-  { id: 3, name: '算法工程师', direction: 'algorithm', difficulty: 'senior', skills: ['Python', 'PyTorch', '机器学习'] },
-  { id: 4, name: '产品经理', direction: 'product', difficulty: 'mid', skills: ['需求分析', 'Axure', '数据分析'] },
-  { id: 5, name: 'Go 后端开发', direction: 'backend', difficulty: 'senior', skills: ['Go', 'gRPC', 'Redis'] },
-  { id: 6, name: '数据分析师', direction: 'data', difficulty: 'junior', skills: ['SQL', 'Python', 'Tableau'] },
+  { id: 1, name: 'Java 开发工程师', company: '云启科技', direction: 'backend', difficulty: 'mid', skills: ['Java', 'Spring Boot', 'MySQL'] },
+  { id: 2, name: '前端开发工程师', company: '星图网络', direction: 'frontend', difficulty: 'mid', skills: ['Vue', 'React', 'TypeScript'] },
+  { id: 3, name: '算法工程师', company: '智算引擎', direction: 'algorithm', difficulty: 'senior', skills: ['Python', 'PyTorch', '机器学习'] },
+  { id: 4, name: '产品经理', company: '青禾科技', direction: 'product', difficulty: 'mid', skills: ['需求分析', 'Axure', '数据分析'] },
+  { id: 5, name: 'Go 后端开发', company: '极光云', direction: 'backend', difficulty: 'senior', skills: ['Go', 'gRPC', 'Redis'] },
+  { id: 6, name: '数据分析师', company: '数维科技', direction: 'data', difficulty: 'junior', skills: ['SQL', 'Python', 'Tableau'] },
 ]
 
 onMounted(async () => {
   try {
     const list = await listPositions()
     const active = list.filter((x) => x.status === 'active')
-    // 如果 API 返回的岗位种类太少（<=1 种不同名字），用兜底数据展示多样性
-    const uniqueNames = new Set(active.map((x) => x.name))
-    hotJobs.value = uniqueNames.size > 1 ? active.slice(0, 6) : fallbackJobs
+    // 按岗位名去重取样，保证热门岗位展示不同岗位，而不是清一色同一岗位名
+    const seen = new Set()
+    const diverse = active.filter((x) => {
+      if (seen.has(x.name)) return false
+      seen.add(x.name)
+      return true
+    })
+    hotJobs.value = diverse.length > 1 ? diverse.slice(0, 6) : fallbackJobs
   } catch {
     hotJobs.value = fallbackJobs
   }
@@ -380,6 +386,12 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 600;
   color: var(--app-text);
+}
+.job-position {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--app-text-muted);
+  font-weight: 500;
 }
 .job-meta {
   margin: 6px 0 10px;
