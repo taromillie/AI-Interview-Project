@@ -2,6 +2,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
+    path: '/',
+    name: 'landing',
+    component: () => import('@/views/Landing.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/Login.vue'),
@@ -11,7 +17,7 @@ const routes = [
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     children: [
-      { path: '', name: 'dashboard', component: () => import('@/views/Dashboard.vue') },
+      { path: 'dashboard', name: 'dashboard', component: () => import('@/views/Dashboard.vue') },
       { path: 'diagnosis', name: 'diagnosis', component: () => import('@/views/ResumeDiagnosis.vue') },
       { path: 'jobs', name: 'jobs', component: () => import('@/views/JobMarket.vue') },
       { path: 'interview', name: 'interview', component: () => import('@/views/Interview.vue') },
@@ -40,7 +46,8 @@ router.beforeEach((to) => {
   if (!to.meta.public && !token) {
     return { name: 'login' }
   }
-  if (to.name === 'login' && token) {
+  // 已登录用户访问登录页时，直接进入工作台
+  if (token && to.name === 'login') {
     return { name: 'dashboard' }
   }
 })

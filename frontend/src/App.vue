@@ -3,35 +3,36 @@
 </template>
 
 <style>
-::root {
-  /* Element Plus 主题色：Trust Blue */
-  --el-color-primary: #2563eb;
-  --el-color-primary-light-3: #5b8def;
-  --el-color-primary-light-5: #8fb4f5;
-  --el-color-primary-light-7: #c3d7fa;
-  --el-color-primary-light-8: #dde9fd;
-  --el-color-primary-light-9: #eef4fe;
-  --el-color-primary-dark-2: #1d4fd8;
+:root {
+  /* Element Plus 主题色：中性墨色（去 AI 味、去品牌化） */
+  --el-color-primary: #1a1a1a;
+  --el-color-primary-light-3: #525252;
+  --el-color-primary-light-5: #8a8a8a;
+  --el-color-primary-light-7: #c2c2c2;
+  --el-color-primary-light-8: #d9d9d9;
+  --el-color-primary-light-9: #f0f0f0;
+  --el-color-primary-dark-2: #000000;
 
   --el-border-radius-base: 8px;
   --el-border-radius-small: 6px;
   --el-border-radius-round: 999px;
 
-  /* 设计令牌 */
-  --app-bg: #f4f6fb;
-  --app-text: #0f172a;
-  --app-text-secondary: #64748b;
-  --app-text-muted: #94a3b8;
-  --app-border: #e2e8f0;
-  --app-brand: #2563eb;
-  --app-brand-dark: #1d4fd8;
-  --app-brand-gradient: linear-gradient(135deg, #2563eb 0%, #6366f1 60%, #8b5cf6 100%);
-  --app-brand-soft: #eef4fe;
-  --app-success: #10b981;
-  --app-warning: #f59e0b;
-  --app-danger: #ef4444;
-  --app-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.05);
-  --app-shadow-md: 0 4px 8px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.1);
+  /* 设计令牌：中性纸感 */
+  --app-bg: #f7f7f5;
+  --app-text: #1a1a1a;
+  --app-text-secondary: #666666;
+  --app-text-muted: #999999;
+  --app-border: #e6e6e6;
+  --app-border-strong: #d4d4d4;
+  --app-brand: #1a1a1a;
+  --app-brand-dark: #000000;
+  --app-brand-gradient: linear-gradient(135deg, #1a1a1a 0%, #333333 100%);
+  --app-brand-soft: #f0f0ee;
+  --app-success: #2f9e6e;
+  --app-warning: #c97f2b;
+  --app-danger: #d64545;
+  --app-shadow-sm: 0 1px 2px rgba(20, 20, 20, 0.04), 0 4px 16px rgba(20, 20, 20, 0.04);
+  --app-shadow-md: 0 4px 8px rgba(20, 20, 20, 0.05), 0 12px 32px rgba(20, 20, 20, 0.08);
   --app-radius-lg: 16px;
   --app-radius-md: 12px;
 
@@ -65,7 +66,7 @@
   --blur-medium: 3px;
   --blur-large: 8px;
 
-  --app-font: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --app-font: -apple-system, BlinkMacSystemFont, 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
@@ -96,24 +97,24 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d4d4d4;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #999999;
 }
 
 /* ==================== Element Plus 细节统一 ==================== */
 
-/* 卡片：更柔和的圆角与阴影 */
+/* 卡片：更克制的圆角与阴影 */
 .el-card {
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius-md);
-  box-shadow: var(--app-shadow-sm);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 .el-card__header {
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--app-border);
   font-weight: 600;
   color: var(--app-text);
   font-size: 15px;
@@ -134,21 +135,22 @@ body {
   transform: scale(0.97);
 }
 
-/* 主按钮渐变 */
+/* 主按钮：纯墨色，去渐变 */
 .el-button--primary {
-  --el-button-hover-bg-color: #3b82f6;
-  --el-button-hover-border-color: #3b82f6;
-  --el-button-active-bg-color: var(--app-brand-dark);
-  --el-button-active-border-color: var(--app-brand-dark);
+  --el-button-hover-bg-color: #333333;
+  --el-button-hover-border-color: #333333;
+  --el-button-active-bg-color: #000000;
+  --el-button-active-border-color: #000000;
 }
 .el-button--primary:not(.is-plain):not(.is-text) {
-  background-image: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  background-color: #1a1a1a;
+  background-image: none;
   border: none;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.18);
 }
 .el-button--primary:not(.is-plain):not(.is-text):hover {
-  background-image: linear-gradient(135deg, #3b82f6 0%, #5b5bf0 100%);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
+  background-color: #333333;
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.22);
 }
 .el-button--primary.is-plain {
   --el-button-plain-hover-bg-color: var(--app-brand-soft);
@@ -226,10 +228,10 @@ body {
 
 /* 表格细节 */
 .el-table {
-  --el-table-header-bg-color: #f8fafc;
-  --el-table-header-text-color: #475569;
-  --el-table-border-color: #eef2f7;
-  --el-table-row-hover-bg-color: #f8faff;
+  --el-table-header-bg-color: #fafaf9;
+  --el-table-header-text-color: #666666;
+  --el-table-border-color: #ededed;
+  --el-table-row-hover-bg-color: #fafaf9;
   border-radius: 10px;
 }
 .el-table th.el-table__cell {
@@ -246,10 +248,10 @@ body {
 
 /* Timeline 圆点 */
 .el-timeline-item__tail {
-  border-left: 2px solid #eef2f7;
+  border-left: 2px solid #ededed;
 }
 .el-timeline-item__node {
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.08);
 }
 
 /* 提示消息 */
@@ -260,17 +262,17 @@ body {
 
 /* ==================== 通用页面元素 ==================== */
 
-/* 渐变页头 Banner（白色卡片 + 深色文字，兼容所有背景） */
+/* 页头 Banner（白色卡片 + 深色文字，兼容所有背景） */
 .page-banner {
   position: relative;
   overflow: hidden;
   border-radius: var(--app-radius-lg);
   padding: 22px 26px;
   margin-bottom: 20px;
-  color: #0f172a;
-  background: #fff;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: var(--app-shadow-sm);
+  color: var(--app-text);
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -304,7 +306,7 @@ body {
   margin-top: 5px;
   font-size: 13px;
   line-height: 1.6;
-  color: #64748b;
+  color: var(--app-text-secondary);
   max-width: 720px;
 }
 .banner-actions {
@@ -349,7 +351,7 @@ body {
   width: 4px;
   height: 16px;
   border-radius: 2px;
-  background: var(--app-brand-gradient);
+  background: var(--app-brand);
 }
 
 /* 历史列表条目统一 */
@@ -377,16 +379,16 @@ body {
 }
 @media (hover: hover) and (pointer: fine) {
   .history-item:hover {
-    border-color: var(--el-color-primary-light-5);
-    background: #f8faff;
+    border-color: var(--app-border-strong);
+    background: #fafaf9;
   }
 }
 .history-item.selected {
   border-color: var(--app-success);
-  background: #ecfdf5;
+  background: #eef7f2;
 }
 .history-item.active {
-  border-color: var(--el-color-primary);
+  border-color: var(--app-brand);
   background: var(--app-brand-soft);
 }
 

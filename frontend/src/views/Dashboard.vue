@@ -1,22 +1,32 @@
 <template>
   <div class="dashboard">
-    <!-- Hero：大标题 + 居中大输入框 -->
+    <!-- Hero：对话式入口 -->
     <section class="hero">
-      <div class="hero-title">你好，{{ userStore.username }}</div>
-      <div class="hero-desc">告诉我你想面试的岗位，直接开始一场模拟面试</div>
-      <div class="big-input">
-        <el-icon class="big-ico"><Search /></el-icon>
-        <input
-          v-model="target"
-          class="big-field"
-          placeholder="如：后端开发工程师、AI 产品经理…"
-          @keyup.enter="startByTarget"
-        />
-        <button class="big-btn" @click="startByTarget">
-          <el-icon :size="17"><MagicStick /></el-icon>
-          <span>开始面试</span>
-        </button>
+      <h1 class="hero-title">你的 AI 面试官</h1>
+      <p class="hero-desc">告诉它你想面的岗位，直接开始一场真实感的模拟面试</p>
+
+      <div class="hero-card">
+        <p class="hero-card__prompt">告诉我你想面试的岗位</p>
+        <p class="hero-card__hint">例如：字节 AI 产品经理终面 · CTO 面我 · 压力面 · 30 分钟</p>
+        <form class="cta-form" @submit.prevent="startByTarget">
+          <input
+            v-model="target"
+            class="cta-field"
+            placeholder="输入岗位名称，或直接上传岗位描述…"
+            @keyup.enter="startByTarget"
+          />
+          <button type="submit" class="cta-btn">
+            <span>开始面试</span>
+            <el-icon :size="15"><ArrowRight /></el-icon>
+          </button>
+        </form>
+        <div class="chips">
+          <button v-for="c in chips" :key="c.text" class="chip" @click="useChip(c)">
+            {{ c.text }}
+          </button>
+        </div>
       </div>
+
       <div class="quick-row">
         <button class="quick" @click="go('/diagnosis')"><el-icon><Document /></el-icon>简历诊断</button>
         <button class="quick" @click="go('/jobs')"><el-icon><Grid /></el-icon>岗位广场</button>
@@ -28,7 +38,7 @@
     <!-- 热门岗位 -->
     <section v-if="hotJobs.length" class="section">
       <div class="section-head">
-        <div class="section-title">热门岗位</div>
+        <p class="num-label">01 — 热门岗位</p>
         <button class="more" @click="go('/jobs')">查看全部 <el-icon><ArrowRight /></el-icon></button>
       </div>
       <div class="job-grid">
@@ -50,17 +60,15 @@
     <!-- 功能入口 -->
     <section class="section">
       <div class="section-head">
-        <div class="section-title">更多功能</div>
+        <p class="num-label">02 — 更多功能</p>
       </div>
       <div class="cards">
-        <button v-for="c in cards" :key="c.path" class="card" @click="go(c.path)">
-          <div class="card-ico" :style="{ background: c.bg }">
-            <el-icon :size="18"><component :is="c.icon" /></el-icon>
-          </div>
-          <div class="card-body">
-            <div class="card-title">{{ c.title }}</div>
-            <div class="card-desc">{{ c.desc }}</div>
-          </div>
+        <button v-for="(c, i) in cards" :key="c.path" class="card" @click="go(c.path)">
+          <span class="card-num">{{ String(i + 1).padStart(2, '0') }}</span>
+          <span class="card-body">
+            <span class="card-title">{{ c.title }}</span>
+            <span class="card-desc">{{ c.desc }}</span>
+          </span>
           <el-icon class="card-arrow"><ArrowRight /></el-icon>
         </button>
       </div>
@@ -73,19 +81,10 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
-  Calendar,
-  Collection,
   Compass,
   Document,
-  EditPen,
   Grid,
-  MagicStick,
-  Microphone,
   Money,
-  Search,
-  Setting,
-  TrendCharts,
-  Trophy,
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { listPositions } from '@/api/question'
@@ -95,25 +94,42 @@ const userStore = useUserStore()
 const target = ref('')
 const hotJobs = ref([])
 
+const chips = [
+  { text: '我想面字节的 AI 产品经理', target: '字节 AI 产品经理' },
+  { text: '我想体验 HR 面', target: 'HR 面试' },
+  { text: '根据我简历挑个岗位面', target: '' },
+  { text: '来一场压力面试', target: '压力面' },
+]
+
 const cards = [
-  { path: '/interview', title: '模拟面试', desc: '可选面试官与难度的 AI 面试', icon: 'Microphone', bg: 'linear-gradient(135deg,#2563eb,#4f46e5)' },
-  { path: '/diagnosis', title: '简历 × JD 诊断', desc: '上传简历 + 粘贴 JD 定位差距', icon: 'Document', bg: 'linear-gradient(135deg,#0ea5e9,#3b82f6)' },
-  { path: '/offer', title: 'Offer 对比', desc: '多 Offer 总包与 AI 建议', icon: 'Trophy', bg: 'linear-gradient(135deg,#10b981,#22c55e)' },
-  { path: '/profile', title: '能力画像', desc: '多场面试聚合洞察短板', icon: 'TrendCharts', bg: 'linear-gradient(135deg,#06b6d4,#3b82f6)' },
-  { path: '/study-plan', title: '备战日历', desc: '依据能力缺口生成计划', icon: 'Calendar', bg: 'linear-gradient(135deg,#8b5cf6,#d946ef)' },
-  { path: '/real-interview', title: '真实面试复盘', desc: '录入真实问答 AI 逐题批改', icon: 'EditPen', bg: 'linear-gradient(135deg,#ec4899,#a855f7)' },
-  { path: '/questions', title: '题库管理', desc: '知识原子维护与发布', icon: 'Collection', bg: 'linear-gradient(135deg,#64748b,#94a3b8)' },
-  { path: '/providers', title: '模型配置', desc: '配置 LLM API Key', icon: 'Setting', bg: 'linear-gradient(135deg,#6d28d9,#7c3aed)' },
+  { path: '/interview', title: '模拟面试', desc: '可选面试官与难度的 AI 面试' },
+  { path: '/diagnosis', title: '简历 × JD 诊断', desc: '上传简历 + 粘贴 JD 定位差距' },
+  { path: '/real-interview', title: '真实面试复盘', desc: '录入真实问答 AI 逐题批改' },
+  { path: '/offer', title: 'Offer 对比', desc: '多 Offer 总包与 AI 建议' },
+  { path: '/profile', title: '能力画像', desc: '多场面试聚合洞察短板' },
+  { path: '/study-plan', title: '备战日历', desc: '依据能力缺口生成计划' },
+  { path: '/career', title: '转行诊断', desc: '评估转行可行性与路径' },
+  { path: '/salary', title: '谈薪评估', desc: '了解你的市场薪资水位' },
+  { path: '/questions', title: '题库管理', desc: '知识原子维护与发布' },
+  { path: '/providers', title: '模型配置', desc: '配置 LLM API Key' },
 ]
 
 function go(path) {
   router.push(path)
 }
 
+function useChip(c) {
+  if (c.target) {
+    router.push({ name: 'interview', query: { target: c.target } })
+  } else {
+    go('/diagnosis')
+  }
+}
+
 function startByTarget() {
   const kw = target.value.trim()
   if (!kw) {
-    router.push('/jobs')
+    go('/jobs')
     return
   }
   router.push({ name: 'interview', query: { target: kw } })
@@ -130,107 +146,160 @@ function difficultyText(d) {
   return { junior: '初级', mid: '中级', senior: '高级' }[d] || d || '通用'
 }
 
+const fallbackJobs = [
+  { id: 1, name: 'Java 开发工程师', direction: 'backend', difficulty: 'mid', skills: ['Java', 'Spring Boot', 'MySQL'] },
+  { id: 2, name: '前端开发工程师', direction: 'frontend', difficulty: 'mid', skills: ['Vue', 'React', 'TypeScript'] },
+  { id: 3, name: '算法工程师', direction: 'algorithm', difficulty: 'senior', skills: ['Python', 'PyTorch', '机器学习'] },
+  { id: 4, name: '产品经理', direction: 'product', difficulty: 'mid', skills: ['需求分析', 'Axure', '数据分析'] },
+  { id: 5, name: 'Go 后端开发', direction: 'backend', difficulty: 'senior', skills: ['Go', 'gRPC', 'Redis'] },
+  { id: 6, name: '数据分析师', direction: 'data', difficulty: 'junior', skills: ['SQL', 'Python', 'Tableau'] },
+]
+
 onMounted(async () => {
   try {
     const list = await listPositions()
-    hotJobs.value = list.filter((x) => x.status === 'active').slice(0, 6)
+    const active = list.filter((x) => x.status === 'active')
+    // 如果 API 返回的岗位种类太少（<=1 种不同名字），用兜底数据展示多样性
+    const uniqueNames = new Set(active.map((x) => x.name))
+    hotJobs.value = uniqueNames.size > 1 ? active.slice(0, 6) : fallbackJobs
   } catch {
-    /* 忽略 */
+    hotJobs.value = fallbackJobs
   }
 })
 </script>
 
 <style scoped>
 .dashboard {
-  max-width: 960px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
 /* ---------- Hero ---------- */
 .hero {
   text-align: center;
-  padding: 46px 0 30px;
+  padding: 46px 0 34px;
 }
 .hero-title {
-  font-size: 32px;
-  font-weight: 800;
-  color: #0f172a;
-  letter-spacing: 0.3px;
+  font-size: clamp(30px, 5vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--app-text);
+  line-height: 1.15;
 }
 .hero-desc {
   margin-top: 10px;
   font-size: 15px;
-  color: #64748b;
+  color: var(--app-text-secondary);
 }
-.big-input {
-  max-width: 600px;
-  margin: 26px auto 0;
-  height: 58px;
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  padding: 0 8px 0 20px;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
-  transition: border-color 0.2s, box-shadow 0.25s;
+
+/* 输入卡片 */
+.hero-card {
+  max-width: 640px;
+  margin: 30px auto 0;
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  padding: 26px 28px 22px;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(20, 20, 20, 0.02), 0 16px 40px -12px rgba(20, 20, 20, 0.1);
 }
-.big-input:focus-within {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), var(--app-shadow-md, 0 8px 20px rgba(15, 23, 42, 0.08));
+.hero-card__prompt {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-text);
 }
-.big-ico {
-  color: #94a3b8;
-  font-size: 19px;
-  margin-right: 10px;
-  flex-shrink: 0;
+.hero-card__hint {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--app-text-muted);
 }
-.big-field {
-  flex: 1;
+
+.cta-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--app-bg);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cta-form:focus-within {
+  border-color: var(--app-text);
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.06);
+}
+.cta-field {
   border: none;
-  outline: none;
-  font-size: 15px;
-  color: #0f172a;
   background: transparent;
+  outline: none;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--app-text);
   min-width: 0;
 }
-.big-field::placeholder {
-  color: #b0b9c9;
+.cta-field::placeholder {
+  color: #b0b0b0;
 }
-.big-btn {
+.cta-btn {
   border: none;
-  height: 44px;
-  padding: 0 22px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  background: var(--app-brand);
   color: #fff;
-  font-size: 14px;
+  border-radius: 9px;
+  padding: 10px 18px;
+  font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), box-shadow 0.2s;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  transition: background-color 0.2s ease, transform 160ms var(--ease-out);
 }
-.big-btn:hover {
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+@media (hover: hover) and (pointer: fine) {
+  .cta-btn:hover {
+    background: #333333;
+  }
 }
-.big-btn:active {
-  transform: scale(0.96);
+.cta-btn:active {
+  transform: scale(0.97);
 }
+
+/* 快捷选项 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.chip {
+  border: 1px solid var(--app-border);
+  background: var(--app-bg);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    border-color: var(--app-border-strong);
+    color: var(--app-text);
+    background: #fff;
+  }
+}
+
 .quick-row {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 22px;
 }
 .quick {
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
+  border: 1px solid var(--app-border);
+  background: transparent;
+  color: var(--app-text-secondary);
   font-size: 13px;
   border-radius: 999px;
   padding: 8px 16px;
@@ -238,17 +307,19 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
 }
-.quick:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .quick:hover {
+    border-color: var(--app-text);
+    color: var(--app-text);
+    background: var(--app-brand-soft);
+  }
 }
 
-/* ---------- 通用 section ---------- */
+/* ---------- Section ---------- */
 .section {
-  margin-top: 26px;
+  margin-top: 34px;
 }
 .section-head {
   display: flex;
@@ -256,61 +327,70 @@ onMounted(async () => {
   justify-content: space-between;
   margin-bottom: 14px;
 }
-.section-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #0f172a;
+.num-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-text-muted);
+  font-weight: 600;
 }
 .more {
   border: none;
   background: none;
-  color: #2563eb;
+  color: var(--app-text-secondary);
   font-size: 13px;
   display: flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
+  transition: color 0.18s ease;
 }
-.more:hover {
-  opacity: 0.75;
+@media (hover: hover) and (pointer: fine) {
+  .more:hover {
+    color: var(--app-text);
+  }
 }
 
 /* ---------- 岗位卡片 ---------- */
 .job-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 14px;
 }
 .job-card {
   background: #fff;
-  border: 1px solid #eef1f6;
-  border-radius: var(--app-radius-lg, 16px);
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
   padding: 18px;
   cursor: pointer;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
-  transition: transform 0.22s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), box-shadow 0.25s, border-color 0.25s;
+  transition: border-color 0.2s ease, transform 0.2s var(--ease-out), box-shadow 0.2s ease;
 }
-.job-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(37, 99, 235, 0.35);
-  box-shadow: var(--app-shadow-md, 0 10px 24px rgba(15, 23, 42, 0.1));
+@media (hover: hover) and (pointer: fine) {
+  .job-card:hover {
+    border-color: var(--app-border-strong);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(20, 20, 20, 0.04), 0 12px 32px rgba(20, 20, 20, 0.08);
+  }
+}
+.job-card:active {
+  transform: scale(0.98);
 }
 .job-name {
   font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 600;
+  color: var(--app-text);
 }
 .job-meta {
   margin: 6px 0 10px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .dot-sep {
-  color: #cbd5e1;
+  color: var(--app-border-strong);
 }
 .job-skills {
   display: flex;
@@ -319,8 +399,8 @@ onMounted(async () => {
   min-height: 22px;
 }
 .pill {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--app-brand-soft);
+  color: var(--app-text-secondary);
   font-size: 11px;
   padding: 2px 9px;
   border-radius: 999px;
@@ -332,66 +412,71 @@ onMounted(async () => {
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #2563eb;
+  color: var(--app-text-secondary);
 }
 
-/* ---------- 功能卡片 ---------- */
+/* ---------- 功能列表 ---------- */
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
 }
 .card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   background: #fff;
-  border: 1px solid #eef1f6;
-  border-radius: var(--app-radius-md, 14px);
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
   padding: 14px 16px;
   cursor: pointer;
   text-align: left;
-  transition: transform 0.2s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), box-shadow 0.25s, border-color 0.25s;
+  transition: border-color 0.2s ease, transform 0.2s var(--ease-out);
 }
-.card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(37, 99, 235, 0.3);
-  box-shadow: var(--app-shadow-md, 0 10px 24px rgba(15, 23, 42, 0.08));
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    border-color: var(--app-border-strong);
+    transform: translateY(-1px);
+  }
 }
-.card-ico {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
+.card:active {
+  transform: scale(0.985);
+}
+.card-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 .card-body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .card-title {
   font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 600;
+  color: var(--app-text);
 }
 .card-desc {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .card-arrow {
-  color: #cbd5e1;
+  color: var(--app-border-strong);
   flex-shrink: 0;
-  transition: transform 0.2s, color 0.2s;
+  transition: transform 0.2s var(--ease-out), color 0.2s ease;
 }
-.card:hover .card-arrow {
-  color: #2563eb;
-  transform: translateX(3px);
+@media (hover: hover) and (pointer: fine) {
+  .card:hover .card-arrow {
+    color: var(--app-text);
+    transform: translateX(3px);
+  }
 }
 </style>

@@ -401,12 +401,12 @@ onUnmounted(() => {
 .hero-title {
   font-size: 30px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--app-text);
   letter-spacing: 0.5px;
 }
 .hero-desc {
   margin-top: 8px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   font-size: 14px;
 }
 .search-bar {
@@ -414,21 +414,21 @@ onUnmounted(() => {
   max-width: 560px;
   margin: 22px auto 0;
   background: #fff;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--app-border);
   border-radius: 16px;
   display: flex;
   align-items: center;
   padding: 0 16px;
   height: 52px;
   transition: border-color 0.2s, box-shadow 0.25s;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
 }
 .search-bar:focus-within {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  border-color: #1a1a1a;
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.08), var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
 }
 .search-ico {
-  color: #94a3b8;
+  color: var(--app-text-muted);
   font-size: 18px;
   margin-right: 10px;
   flex-shrink: 0;
@@ -438,22 +438,22 @@ onUnmounted(() => {
   border: none;
   outline: none;
   font-size: 15px;
-  color: #0f172a;
+  color: var(--app-text);
   background: transparent;
 }
 .search-input::placeholder {
-  color: #b0b9c9;
+  color: #b3b3b3;
 }
 .search-clear {
   border: none;
-  background: #f1f5f9;
+  background: #f4f4f2;
   border-radius: 50%;
   width: 24px;
   height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--app-text-secondary);
   cursor: pointer;
 }
 .filter-row {
@@ -470,27 +470,27 @@ onUnmounted(() => {
 }
 .chip-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   margin-right: 2px;
 }
 .chip {
   border: none;
   background: #fff;
-  color: #64748b;
+  color: var(--app-text-secondary);
   font-size: 13px;
   padding: 6px 14px;
   border-radius: 999px;
   cursor: pointer;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border);
   transition: all 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 .chip:hover {
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: #1a1a1a;
+  color: #1a1a1a;
 }
 .chip.on {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: #1a1a1a;
+  border-color: #1a1a1a;
   color: #fff;
   font-weight: 600;
 }
@@ -514,7 +514,7 @@ onUnmounted(() => {
 }
 .sync-select :deep(.el-select__wrapper) {
   border-radius: 999px;
-  box-shadow: 0 0 0 1px #e2e8f0 inset;
+  box-shadow: 0 0 0 1px var(--app-border) inset;
   font-size: 12px;
 }
 .meta-item {
@@ -522,15 +522,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
 }
 .refresh-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border);
   background: #fff;
-  color: #475569;
+  color: var(--app-text-secondary);
   font-size: 12px;
   padding: 5px 12px;
   border-radius: 999px;
@@ -538,8 +538,8 @@ onUnmounted(() => {
   transition: all 0.18s;
 }
 .refresh-btn:hover:not(:disabled) {
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: #1a1a1a;
+  color: #1a1a1a;
 }
 .refresh-btn:disabled {
   opacity: 0.6;
@@ -560,7 +560,7 @@ onUnmounted(() => {
 }
 .job-card {
   background: #fff;
-  border: 1px solid #eef1f6;
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg, 16px);
   padding: 18px 18px 16px;
   display: flex;
@@ -569,12 +569,12 @@ onUnmounted(() => {
   cursor: pointer;
   transition: transform 0.22s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
     box-shadow 0.25s ease, border-color 0.25s ease;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
 }
 .job-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(37, 99, 235, 0.35);
-  box-shadow: var(--app-shadow-md, 0 10px 24px rgba(15, 23, 42, 0.1));
+  border-color: rgba(26, 26, 26, 0.25);
+  box-shadow: var(--app-shadow-md, 0 10px 24px rgba(20, 20, 20, 0.08));
 }
 .job-head {
   display: flex;
@@ -585,7 +585,7 @@ onUnmounted(() => {
 .job-name {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
   line-height: 1.35;
 }
 .job-tags {
@@ -596,7 +596,7 @@ onUnmounted(() => {
 }
 .job-company {
   font-size: 13px;
-  color: #475569;
+  color: var(--app-text-secondary);
   font-weight: 600;
 }
 .job-meta {
@@ -609,8 +609,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 3px;
   font-size: 12px;
-  color: #2563eb;
-  background: #eff6ff;
+  color: #1a1a1a;
+  background: #f0f0ee;
   padding: 3px 9px;
   border-radius: 8px;
 }
@@ -619,8 +619,8 @@ onUnmounted(() => {
   background: #fff7ed;
 }
 .meta-chip.salary.off {
-  color: #94a3b8;
-  background: #f1f5f9;
+  color: var(--app-text-muted);
+  background: #f4f4f2;
 }
 .job-skills {
   display: flex;
@@ -629,15 +629,15 @@ onUnmounted(() => {
   min-height: 22px;
 }
 .skill-pill {
-  background: #f1f5f9;
-  color: #475569;
+  background: #f4f4f2;
+  color: var(--app-text-secondary);
   font-size: 12px;
   padding: 3px 10px;
   border-radius: 999px;
 }
 .skill-more {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   align-self: center;
 }
 .job-foot {
@@ -648,10 +648,10 @@ onUnmounted(() => {
 .detail-btn {
   flex: 1;
   height: 40px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border);
   border-radius: 12px;
   background: #fff;
-  color: #475569;
+  color: var(--app-text-secondary);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -661,15 +661,15 @@ onUnmounted(() => {
   transition: all 0.18s;
 }
 .detail-btn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: #1a1a1a;
+  color: #1a1a1a;
 }
 .interview-btn {
   flex: 1.4;
   height: 40px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  background: #1a1a1a;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -679,17 +679,17 @@ onUnmounted(() => {
   gap: 5px;
   cursor: pointer;
   transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), box-shadow 0.2s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.25);
 }
 .interview-btn:hover {
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 6px 18px rgba(26, 26, 26, 0.25);
 }
 .interview-btn:active {
   transform: scale(0.97);
 }
 .loading {
   text-align: center;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   padding: 40px 0;
 }
 
@@ -697,7 +697,7 @@ onUnmounted(() => {
 .modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(20, 20, 20, 0.4);
   backdrop-filter: blur(3px);
   z-index: 1000;
   display: flex;
@@ -713,7 +713,7 @@ onUnmounted(() => {
   flex-direction: column;
   background: #fff;
   border-radius: 20px;
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 24px 64px rgba(20, 20, 20, 0.2);
   overflow: hidden;
 }
 .modal-head {
@@ -722,40 +722,40 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 12px;
   padding: 22px 24px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f4f4f2;
 }
 .modal-name {
   font-size: 20px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .modal-sub {
   margin-top: 6px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 .dot {
-  color: #cbd5e1;
+  color: var(--app-border-strong);
 }
 .modal-close {
   border: none;
-  background: #f1f5f9;
+  background: #f4f4f2;
   border-radius: 50%;
   width: 30px;
   height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--app-text-secondary);
   cursor: pointer;
   flex-shrink: 0;
 }
 .modal-close:hover {
-  background: #e2e8f0;
+  background: var(--app-border);
 }
 .modal-body {
   padding: 18px 24px;
@@ -767,20 +767,20 @@ onUnmounted(() => {
   gap: 10px;
 }
 .info-item {
-  background: #f8fafc;
-  border: 1px solid #f1f5f9;
+  background: #fafaf9;
+  border: 1px solid #f4f4f2;
   border-radius: 12px;
   padding: 10px 12px;
 }
 .info-label {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
 }
 .info-value {
   margin-top: 4px;
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .section {
   margin-top: 18px;
@@ -788,7 +788,7 @@ onUnmounted(() => {
 .section-title {
   font-size: 13px;
   font-weight: 700;
-  color: #334155;
+  color: var(--app-text);
   margin-bottom: 8px;
 }
 .skill-tags {
@@ -814,9 +814,9 @@ onUnmounted(() => {
 .jd-text {
   font-size: 13px;
   line-height: 1.8;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #f1f5f9;
+  color: var(--app-text-secondary);
+  background: #fafaf9;
+  border: 1px solid #f4f4f2;
   border-radius: 12px;
   padding: 12px 14px;
   white-space: pre-wrap;
@@ -827,7 +827,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 14px 24px 18px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #f4f4f2;
 }
 .src-info {
   display: flex;
@@ -837,8 +837,8 @@ onUnmounted(() => {
 }
 .src-badge {
   font-size: 11px;
-  color: #64748b;
-  background: #f1f5f9;
+  color: var(--app-text-secondary);
+  background: #f4f4f2;
   padding: 3px 8px;
   border-radius: 6px;
 }
@@ -847,7 +847,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 3px;
   font-size: 12px;
-  color: #2563eb;
+  color: #1a1a1a;
   text-decoration: none;
 }
 .src-link:hover {
@@ -855,7 +855,7 @@ onUnmounted(() => {
 }
 .src-time {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
 }
 .modal-actions .interview-btn {
   flex: none;

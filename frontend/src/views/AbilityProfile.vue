@@ -183,7 +183,7 @@
               :y="ty(25 * g) + 4"
               text-anchor="end"
               font-size="11"
-              fill="#94a3b8"
+              fill="var(--app-text-muted)"
             >
               {{ 25 * g }}
             </text>
@@ -215,7 +215,7 @@
                 :y="TH - 8"
                 text-anchor="middle"
                 font-size="11"
-                fill="#94a3b8"
+                fill="var(--app-text-muted)"
               >
                 {{ shortDate(d.created_at) }}
               </text>
@@ -276,7 +276,7 @@ const PAD_L = 44
 const PAD_R = 18
 const PAD_T = 16
 const PAD_B = 30
-const TREND_COLORS = { tech: '#2563eb', expression: '#7c3aed', logic: '#059669', project: '#d97706' }
+const TREND_COLORS = { tech: '#1a1a1a', expression: '#3a3a3a', logic: '#059669', project: '#d97706' }
 
 function tx(i) {
   const n = (profile.value.trend || []).length
@@ -373,7 +373,7 @@ onMounted(load)
   text-align: right;
   font-size: 13px;
   font-weight: 700;
-  color: #2563eb;
+  color: #1a1a1a;
 }
 .skill-grid {
   display: grid;
@@ -435,7 +435,7 @@ onMounted(load)
   gap: 8px;
   font-size: 13px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--app-text-secondary);
   padding: 4px 0;
 }
 .advice-item.ok .advice-badge {

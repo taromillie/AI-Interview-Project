@@ -245,16 +245,16 @@ onMounted(load)
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
   padding: 14px 20px;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
 }
 .page-title {
   font-size: 17px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .page-desc {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   margin-top: 2px;
 }
 .list-wrap {
@@ -282,9 +282,9 @@ onMounted(load)
 }
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 20px rgba(20, 20, 20, 0.08);
     transform: translateY(-2px);
-    border-color: rgba(37, 99, 235, 0.3);
+    border-color: rgba(26, 26, 26, 0.3);
   }
 }
 .card-title {
@@ -293,14 +293,14 @@ onMounted(load)
   gap: 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .card-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   margin-top: 6px;
 }
 .card-side {
@@ -316,14 +316,14 @@ onMounted(load)
 .score {
   font-size: 24px;
   font-weight: 800;
-  color: #2563eb;
+  color: #1a1a1a;
 }
 .score-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
 }
 .dot {
-  color: #cbd5e1;
+  color: var(--app-border-strong);
 }
 
 /* 抽屉内 */
@@ -336,22 +336,22 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(120deg, #f8faff 0%, #eef2ff 100%);
-  border: 1px solid #e0e7ff;
+  background: linear-gradient(120deg, #fafaf9 0%, #f0f0ee 100%);
+  border: 1px solid #f0f0ee;
   border-radius: 12px;
   padding: 16px 18px;
 }
 .ov-pos {
   font-size: 16px;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--app-text);
 }
 .ov-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   margin-top: 6px;
 }
 .ov-score {
@@ -365,19 +365,19 @@ onMounted(load)
 .section-title {
   font-size: 15px;
   font-weight: 800;
-  color: #0f172a;
-  border-left: 3px solid #2563eb;
+  color: var(--app-text);
+  border-left: 3px solid #1a1a1a;
   padding-left: 10px;
 }
 .msg {
-  background: #f8fafc;
+  background: #fafaf9;
   border-radius: 10px;
   padding: 10px 14px;
   border: 1px solid #eef2f7;
 }
 .msg.user {
-  background: #eff6ff;
-  border-color: #dbeafe;
+  background: #f0f0ee;
+  border-color: #f0f0ee;
 }
 .msg-head {
   display: flex;
@@ -388,15 +388,15 @@ onMounted(load)
 .msg-role {
   font-size: 12px;
   font-weight: 700;
-  color: #475569;
+  color: var(--app-text-secondary);
 }
 .msg.user .msg-role {
-  color: #2563eb;
+  color: #1a1a1a;
 }
 .msg-body {
   font-size: 14px;
   line-height: 1.7;
-  color: #1e293b;
+  color: var(--app-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -418,14 +418,14 @@ onMounted(load)
   width: 72px;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--app-text-secondary);
 }
 .dim-val {
   width: 28px;
   text-align: right;
   font-size: 13px;
   font-weight: 700;
-  color: #2563eb;
+  color: #1a1a1a;
 }
 .weak-title {
   font-size: 13px;
@@ -455,18 +455,18 @@ onMounted(load)
 .rep-q {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .rep-answer {
   font-size: 13px;
-  color: #475569;
+  color: var(--app-text-secondary);
   margin-top: 8px;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .rep-comment {
   font-size: 13px;
-  color: #7c3aed;
+  color: #3a3a3a;
   margin-top: 6px;
   white-space: pre-wrap;
   word-break: break-word;

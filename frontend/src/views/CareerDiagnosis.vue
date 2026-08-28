@@ -440,12 +440,12 @@ onMounted(() => {
 .page-title {
   font-size: 26px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .page-desc {
   margin-top: 6px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
 }
 
 /* ── 步骤条（与面试向导一致） ── */
@@ -458,7 +458,7 @@ onMounted(() => {
   background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
 }
 .w-step {
   display: flex;
@@ -482,16 +482,16 @@ onMounted(() => {
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  color: #94a3b8;
-  background: #f1f5f9;
-  border: 2px solid #e2e8f0;
+  color: var(--app-text-muted);
+  background: #f4f4f2;
+  border: 2px solid var(--app-border);
   transition: all 0.3s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 .w-step.active .w-dot {
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
   border-color: transparent;
-  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 5px rgba(26, 26, 26, 0.14), 0 6px 16px rgba(26, 26, 26, 0.28);
 }
 .w-step.done .w-dot {
   color: #fff;
@@ -502,16 +502,16 @@ onMounted(() => {
 .w-label {
   font-size: 14px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--app-text-secondary);
   transition: color 0.25s ease;
 }
-.w-step.active .w-label { color: #2563eb; }
-.w-step.done .w-label { color: #0f172a; }
+.w-step.active .w-label { color: #1a1a1a; }
+.w-step.done .w-label { color: var(--app-text); }
 .w-line {
   width: 52px;
   height: 3px;
   border-radius: 2px;
-  background: #e2e8f0;
+  background: var(--app-border);
   margin: 0 12px;
   transition: background 0.3s ease;
 }
@@ -523,7 +523,7 @@ onMounted(() => {
   background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
-  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(20, 20, 20, 0.08));
   padding: 24px 28px 26px;
 }
 .w-head {
@@ -541,11 +541,11 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
+  box-shadow: 0 6px 14px rgba(26, 26, 26, 0.25);
 }
 .w-ico.grad {
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  background: linear-gradient(135deg, #444444, #333333);
   box-shadow: 0 6px 14px rgba(139, 92, 246, 0.28);
 }
 .w-ico.green {
@@ -555,11 +555,11 @@ onMounted(() => {
 .w-title {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .w-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   margin-top: 2px;
 }
 
@@ -573,12 +573,12 @@ onMounted(() => {
 }
 .quick-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
 }
 .quick-chip {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border);
   background: #fff;
-  color: #64748b;
+  color: var(--app-text-secondary);
   font-size: 13px;
   padding: 5px 13px;
   border-radius: 999px;
@@ -586,12 +586,12 @@ onMounted(() => {
   transition: all 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 .quick-chip:hover {
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: #1a1a1a;
+  color: #1a1a1a;
 }
 .quick-chip.on {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: #1a1a1a;
+  border-color: #1a1a1a;
   color: #fff;
   font-weight: 600;
 }
@@ -607,7 +607,7 @@ onMounted(() => {
 .nav-text { margin: 0 4px; }
 .nav-hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -626,7 +626,7 @@ onMounted(() => {
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
-  background: #f8fafc;
+  background: #fafaf9;
   border: 1px dashed #dbe3ef;
   border-radius: 12px;
   padding: 12px 16px;
@@ -634,20 +634,20 @@ onMounted(() => {
 }
 .sum-item {
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
 }
 .sum-label {
   margin-right: 6px;
 }
 .sum-item b {
-  color: #0f172a;
+  color: var(--app-text);
 }
 
 /* ── 历史诊断 ── */
 .history-title {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
   margin: 18px 0 10px;
 }
 .history-list {
@@ -661,24 +661,24 @@ onMounted(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 14px;
-  border: 1px solid #eef1f6;
+  border: 1px solid var(--app-border);
   border-radius: 12px;
   cursor: pointer;
   background: #fff;
   transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), border-color 0.2s;
 }
 .history-item:active { transform: scale(0.99); }
-.history-item:hover { border-color: rgba(37, 99, 235, 0.4); }
+.history-item:hover { border-color: rgba(26, 26, 26, 0.4); }
 .history-main { flex: 1; min-width: 0; }
 .history-route {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--app-text);
   margin-bottom: 3px;
 }
 .history-preview {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -701,7 +701,7 @@ onMounted(() => {
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
   padding: 14px 20px;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
 }
 .result-route {
   display: flex;
@@ -710,11 +710,11 @@ onMounted(() => {
   font-size: 17px;
   font-weight: 800;
 }
-.route-from { color: #64748b; }
-.route-arrow { color: #2563eb; display: flex; }
+.route-from { color: var(--app-text-secondary); }
+.route-arrow { color: #1a1a1a; display: flex; }
 .route-to {
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.08);
+  color: #1a1a1a;
+  background: rgba(26, 26, 26, 0.08);
   padding: 2px 10px;
   border-radius: 8px;
 }
@@ -733,7 +733,7 @@ onMounted(() => {
   background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
   padding: 18px 20px;
 }
 .summary-card,
@@ -756,21 +756,21 @@ onMounted(() => {
   color: #fff;
   flex-shrink: 0;
 }
-.rc-ico.blue { background: linear-gradient(135deg, #2563eb, #4f46e5); }
+.rc-ico.blue { background: linear-gradient(135deg, #1a1a1a, #1a1a1a); }
 .rc-ico.green { background: linear-gradient(135deg, #10b981, #059669); }
 .rc-ico.orange { background: linear-gradient(135deg, #f59e0b, #ea580c); }
-.rc-ico.purple { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+.rc-ico.purple { background: linear-gradient(135deg, #444444, #333333); }
 .rc-ico.pink { background: linear-gradient(135deg, #ec4899, #db2777); }
 .rc-title {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .rc-summary {
   margin: 0;
   font-size: 14px;
   line-height: 1.8;
-  color: #475569;
+  color: var(--app-text-secondary);
 }
 
 .transfer-list {
@@ -780,29 +780,29 @@ onMounted(() => {
 }
 .transfer-item {
   padding: 10px 12px;
-  border: 1px solid #eef1f6;
+  border: 1px solid var(--app-border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #fafaf9;
 }
 .transfer-skill {
   font-size: 13px;
   font-weight: 700;
-  color: #2563eb;
+  color: #1a1a1a;
   margin-bottom: 3px;
 }
 .transfer-evidence {
   font-size: 12px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   line-height: 1.6;
 }
 
 .roadmap-stage {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .roadmap-action {
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   margin-top: 2px;
 }
 
@@ -815,11 +815,11 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 .project-item {
-  border: 1px solid #eef1f6;
+  border: 1px solid var(--app-border);
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 8px;
-  background: #f8fafc;
+  background: #fafaf9;
 }
 .project-head {
   display: flex;
@@ -831,11 +831,11 @@ onMounted(() => {
 .project-name {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .project-desc {
   font-size: 12px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   line-height: 1.7;
 }
 </style>

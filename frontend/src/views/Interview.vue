@@ -525,12 +525,12 @@ onMounted(async () => {
 .page-title {
   font-size: 26px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .page-desc {
   margin-top: 6px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
 }
 
 /* ── 步骤条 ── */
@@ -543,7 +543,7 @@ onMounted(async () => {
   background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
 }
 .w-step {
   display: flex;
@@ -567,16 +567,16 @@ onMounted(async () => {
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  color: #94a3b8;
-  background: #f1f5f9;
-  border: 2px solid #e2e8f0;
+  color: var(--app-text-muted);
+  background: #f4f4f2;
+  border: 2px solid var(--app-border);
   transition: all 0.3s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 .w-step.active .w-dot {
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
   border-color: transparent;
-  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 5px rgba(26, 26, 26, 0.14), 0 6px 16px rgba(26, 26, 26, 0.28);
 }
 .w-step.done .w-dot {
   color: #fff;
@@ -587,16 +587,16 @@ onMounted(async () => {
 .w-label {
   font-size: 14px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--app-text-secondary);
   transition: color 0.25s ease;
 }
-.w-step.active .w-label { color: #2563eb; }
-.w-step.done .w-label { color: #0f172a; }
+.w-step.active .w-label { color: #1a1a1a; }
+.w-step.done .w-label { color: var(--app-text); }
 .w-line {
   width: 52px;
   height: 3px;
   border-radius: 2px;
-  background: #e2e8f0;
+  background: var(--app-border);
   margin: 0 12px;
   transition: background 0.3s ease;
 }
@@ -608,7 +608,7 @@ onMounted(async () => {
   background: #fff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--app-radius-lg, 16px);
-  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(20, 20, 20, 0.08));
   padding: 24px 28px 26px;
 }
 .w-head {
@@ -626,11 +626,11 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
+  box-shadow: 0 6px 14px rgba(26, 26, 26, 0.25);
 }
 .w-ico.grad {
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  background: linear-gradient(135deg, #444444, #333333);
   box-shadow: 0 6px 14px rgba(139, 92, 246, 0.28);
 }
 .w-ico.green {
@@ -640,11 +640,11 @@ onMounted(async () => {
 .w-title {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .w-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   margin-top: 2px;
 }
 
@@ -659,7 +659,7 @@ onMounted(async () => {
 .nav-text { margin: 0 4px; }
 .nav-hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -694,12 +694,12 @@ onMounted(async () => {
 }
 .iv-card:hover {
   border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
 }
 .iv-card.on {
-  border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.05);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  border-color: #333333;
+  background: rgba(26, 26, 26, 0.05);
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.1);
 }
 .iv-top {
   display: flex;
@@ -717,7 +717,7 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  background: linear-gradient(135deg, #444444, #333333);
 }
 .iv-info {
   flex: 1;
@@ -726,15 +726,15 @@ onMounted(async () => {
 .iv-name {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .iv-title {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   margin-top: 1px;
 }
 .iv-check {
-  color: #6366f1;
+  color: #333333;
   font-size: 16px;
   flex-shrink: 0;
 }
@@ -742,7 +742,7 @@ onMounted(async () => {
   margin-top: 10px;
   font-size: 12px;
   line-height: 1.6;
-  color: #64748b;
+  color: var(--app-text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -755,14 +755,14 @@ onMounted(async () => {
 }
 .iv-tag {
   font-size: 11px;
-  color: #6366f1;
-  background: rgba(99, 102, 241, 0.1);
+  color: #333333;
+  background: rgba(26, 26, 26, 0.1);
   border-radius: 999px;
   padding: 2px 10px;
 }
 .loading-text {
   text-align: center;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   padding: 30px 0;
 }
 
@@ -792,12 +792,12 @@ onMounted(async () => {
 .diff-name {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .diff-desc {
   margin-top: 6px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--app-text-secondary);
   line-height: 1.55;
 }
 .rounds-form {
@@ -807,7 +807,7 @@ onMounted(async () => {
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
-  background: #f8fafc;
+  background: #fafaf9;
   border: 1px dashed #dbe3ef;
   border-radius: 12px;
   padding: 12px 16px;
@@ -815,13 +815,13 @@ onMounted(async () => {
 }
 .sum-item {
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
 }
 .sum-label {
   margin-right: 6px;
 }
 .sum-item b {
-  color: #0f172a;
+  color: var(--app-text);
 }
 
 /* ── 对话区 ── */
@@ -833,7 +833,7 @@ onMounted(async () => {
   background: #fff;
   border-radius: var(--app-radius-lg, 16px);
   border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(15, 23, 42, 0.08));
+  box-shadow: var(--app-shadow-md, 0 4px 16px rgba(20, 20, 20, 0.08));
   overflow: hidden;
 }
 .chat-head {
@@ -841,22 +841,22 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid #eef1f6;
+  border-bottom: 1px solid var(--app-border);
 }
 .chat-title {
   font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
 }
 .chat-sub {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--app-text-muted);
   margin-top: 3px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.chat-dot { color: #cbd5e1; }
+.chat-dot { color: var(--app-border-strong); }
 .chat-body {
   flex: 1;
   overflow-y: auto;
@@ -888,7 +888,7 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .ai-avatar {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
 }
 .msg-bubble {
   padding: 11px 14px;
@@ -900,12 +900,12 @@ onMounted(async () => {
 }
 .ai-bubble {
   background: #fff;
-  border: 1px solid #eef1f6;
+  border: 1px solid var(--app-border);
   color: #1f2937;
   border-top-left-radius: 4px;
 }
 .user-bubble {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
   color: #fff;
   border-top-right-radius: 4px;
 }
@@ -918,7 +918,7 @@ onMounted(async () => {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--app-text-muted);
   animation: tbounce 1.1s infinite ease-in-out;
 }
 .tdot:nth-child(2) { animation-delay: 0.15s; }
@@ -931,7 +931,7 @@ onMounted(async () => {
   display: flex;
   gap: 10px;
   padding: 14px 16px;
-  border-top: 1px solid #eef1f6;
+  border-top: 1px solid var(--app-border);
   background: #fff;
 }
 .send-btn {
@@ -939,7 +939,7 @@ onMounted(async () => {
   height: 48px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: linear-gradient(135deg, #1a1a1a, #1a1a1a);
   color: #fff;
   display: flex;
   align-items: center;
