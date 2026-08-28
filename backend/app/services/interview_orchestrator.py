@@ -12,6 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents.interview_agent import InterviewAgent
+from app.agents.tools import (
+    ToolCallGuard,
+    get_coverage,
+    get_resume_evidence,
+    search_knowledge,
+)
 from app.core.exceptions import AppError
 from app.llm.base import LLMProvider
 from app.models.interview import Interview, InterviewMessage, Report
@@ -19,7 +25,9 @@ from app.models.interviewer import Interviewer
 from app.models.position import Position
 from app.models.resume import Resume
 from app.models.user import User
-from app.rag.retriever import select_candidates
+from app.rag.embedding import get_embedding_provider
+from app.rag.next_question_decision import analyze_signals, is_low_information
+from app.rag.retriever import hit_score
 from app.services.feedback import fallback_report, generate_report
 
 logger = logging.getLogger(__name__)
@@ -64,13 +72,20 @@ class InterviewOrchestrator:
 
     # ---------- 内部工具 ----------
 
-    def _save_message(self, role: str, content: str, strategy: str | None = None) -> None:
+    def _save_message(
+        self,
+        role: str,
+        content: str,
+        strategy: str | None = None,
+        evidence_atom_ids: list[int] | None = None,
+    ) -> None:
         self.db.add(
             InterviewMessage(
                 interview_id=self.interview.id,
                 role=role,
                 content=content,
                 strategy=strategy,
+                evidence_atom_ids=evidence_atom_ids or [],
             )
         )
 
@@ -94,6 +109,18 @@ class InterviewOrchestrator:
             if m.role != "assistant":
                 continue
             if m.strategy in PROBE_STRATEGIES:
+                streak += 1
+            else:
+                break
+        return streak
+
+    def _avoid_streak(self) -> int:
+        """连续低信息/回避回答轮数：从最近的 user 消息向前数。"""
+        streak = 0
+        for m in reversed(self._messages()):
+            if m.role != "user":
+                continue
+            if is_low_information(m.content):
                 streak += 1
             else:
                 break
@@ -170,26 +197,58 @@ class InterviewOrchestrator:
             return await self.finish()
 
         asked_ids = {m.id for m in self._messages()}
-        candidates = select_candidates(
+        probe_streak = self._probe_streak()
+
+        # ---- 工作包 A：有边界工具装配（只读 + 单轮≤3 次调用） ----
+        guard = ToolCallGuard()
+        embedder = get_embedding_provider()
+
+        # 工具① 候选检索（向量增强 + 关键词降级）
+        tool_res = await search_knowledge(
             self.db,
             self.interview.position_id,
             asked_ids,
             answer_text=content,
             top_n=8,
+            embedder=embedder,
+            guard=guard,
         )
+        candidates = tool_res.data or []
         candidate_texts = [c.question for c in candidates]
 
-        probe_streak = self._probe_streak()
+        # 工具② 简历证据（优先于静态 brief，保证决策上下文新鲜）
+        resume_evidence = get_resume_evidence(self.resume, guard=guard).data or ""
+
+        # 工具③ 技能覆盖度提示（辅助换话题方向）
+        coverage_res = get_coverage(
+            self._position_skills(),
+            [m.content for m in self._messages() if m.role == "assistant"],
+            guard=guard,
+        )
+        coverage = coverage_res.data or {}
+        coverage_hint = coverage.get("hint", "")
+
+        # ---- 工作包 A：四信号决策 ----
+        hit = max((hit_score(c, content) for c in candidates), default=0)
+        signals = analyze_signals(
+            content,
+            hit_score=hit,
+            probe_streak=probe_streak,
+            avoid_streak=self._avoid_streak(),
+        )
+
         decision = await self.agent.decide_next(
             position_name=self._position_name(),
             position_skills=self._position_skills(),
-            resume_brief=self._resume_brief(),
+            resume_brief=resume_evidence or self._resume_brief(),
             history_text=self._history_text(),
             latest_answer=content,
             candidates=candidate_texts,
             asked_rounds=asked_rounds,
             max_rounds=self.interview.max_rounds,
             probe_streak=probe_streak,
+            signals=signals,
+            coverage_hint=coverage_hint,
         )
 
         # 强制兜底：同一方向已连续追问超过上限，必须切换话题，不再死磕
@@ -212,7 +271,12 @@ class InterviewOrchestrator:
             ).get("question", "请再详细讲讲你的思路。")
 
         strategy = decision.get("strategy", "none")
-        self._save_message("assistant", question, strategy)
+        self._save_message(
+            "assistant",
+            question,
+            strategy,
+            evidence_atom_ids=[c.id for c in candidates],
+        )
         self.db.commit()
         return {
             "event": "question",

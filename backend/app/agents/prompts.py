@@ -70,6 +70,8 @@ DECISION_PROMPT = """你是资深面试官，正在对候选人进行「{positio
 
 【轮次】已问 {asked_rounds} 轮，上限 {max_rounds} 轮。
 【追问深度】已对当前话题连续追问 {probe_streak} 轮。
+{signal_section}
+{coverage_hint}
 
 提问风格总则：
 - 像真人面试官一对一聊天，不端书面腔。用一句自然的过渡承接候选人刚说的话，再抛出问题；

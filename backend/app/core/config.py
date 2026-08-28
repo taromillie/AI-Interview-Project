@@ -19,9 +19,14 @@ class Settings(BaseSettings):
     # 数据库
     DATABASE_URL: str = "sqlite:///./app.db"
 
-    # 向量库
+    # 向量库（可选增强：未配置 Embedding 时自动降级为关键词检索）
     VECTOR_DB_PATH: str = "./data/chroma"
+    VECTOR_COLLECTION: str = "knowledge_atoms"
+    EMBEDDING_ENABLED: bool = False
+    EMBEDDING_BASE_URL: str = ""        # OpenAI 兼容地址，如 https://api.openai.com/v1
+    EMBEDDING_API_KEY: str = ""
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    EMBEDDING_TIMEOUT: int = 30
 
     # 安全
     JWT_SECRET: str = "please-change-this-secret"
