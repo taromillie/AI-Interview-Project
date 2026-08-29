@@ -1,5 +1,13 @@
 <template>
   <div class="landing">
+    <!-- 液态极光背景 -->
+    <div class="aurora" aria-hidden="true">
+      <span class="blob blob-cyan"></span>
+      <span class="blob blob-blue"></span>
+      <span class="blob blob-amber"></span>
+      <span class="grid-overlay"></span>
+    </div>
+
     <!-- 顶部导航 -->
     <header class="nav">
       <div class="nav-inner">
@@ -48,12 +56,67 @@
 
 <style scoped>
 .landing {
+  position: relative;
   min-height: 100vh;
-  background: #ffffff;
+  background: linear-gradient(180deg, #080b14 0%, #05070e 100%);
   display: flex;
   flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  color: #0f172a;
+  color: var(--app-text);
+}
+
+/* ---------- 液态极光背景 ---------- */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 800px at 15% -10%, rgba(107, 139, 255, 0.14), transparent 60%),
+    radial-gradient(1000px 700px at 110% 10%, rgba(90, 208, 230, 0.12), transparent 55%),
+    linear-gradient(180deg, #080b14 0%, #05070e 100%);
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.blob-cyan {
+  width: 46vw;
+  height: 46vw;
+  left: -8vw;
+  top: -6vw;
+  background: radial-gradient(circle at 30% 30%, rgba(90, 208, 230, 0.6), transparent 70%);
+  animation: app-blob 20s var(--ease-in-out) infinite;
+}
+.blob-blue {
+  width: 42vw;
+  height: 42vw;
+  right: -10vw;
+  top: 4vw;
+  background: radial-gradient(circle at 60% 40%, rgba(107, 139, 255, 0.55), transparent 70%);
+  animation: app-blob-2 24s var(--ease-in-out) infinite;
+}
+.blob-amber {
+  width: 34vw;
+  height: 34vw;
+  left: 30vw;
+  bottom: -14vw;
+  background: radial-gradient(circle at 50% 50%, rgba(242, 193, 78, 0.28), transparent 70%);
+  animation: app-blob 28s var(--ease-in-out) infinite reverse;
+}
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 80%);
 }
 
 /* ---------- 导航 ---------- */
@@ -61,9 +124,10 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid #f1f5f9;
+  background: rgba(8, 11, 20, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .nav-inner {
   max-width: 1200px;
@@ -80,7 +144,7 @@
   gap: 8px;
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
   text-decoration: none;
   letter-spacing: -0.2px;
 }
@@ -88,8 +152,9 @@
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: #0f172a;
-  color: #fff;
+  background: var(--app-brand-gradient);
+  color: #071018;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 6px 18px -6px rgba(90, 208, 230, 0.6);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -103,12 +168,12 @@
 .nav-link {
   font-size: 14px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--app-text-muted);
   text-decoration: none;
   transition: color 0.2s ease;
 }
 .nav-link:hover {
-  color: #0f172a;
+  color: var(--app-text);
 }
 .nav-actions {
   display: flex;
@@ -118,25 +183,29 @@
 .nav-login {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--app-text);
   text-decoration: none;
 }
 .nav-signup {
   padding: 8px 18px;
   border-radius: 100px;
-  background: #0f172a;
-  color: #ffffff;
+  background-image: var(--app-brand-gradient);
+  color: #071018;
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 6px 18px -6px rgba(107, 139, 255, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 .nav-signup:hover {
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+  filter: brightness(1.08);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset, 0 10px 24px -6px rgba(107, 139, 255, 0.7);
 }
 
 /* ---------- Hero ---------- */
 .hero {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -151,7 +220,7 @@
   line-height: 1.22;
   font-weight: 800;
   letter-spacing: -1.5px;
-  color: #0f172a;
+  color: var(--app-text);
   margin: 0 0 32px;
   display: flex;
   flex-wrap: wrap;
@@ -215,7 +284,7 @@
   max-width: 620px;
   font-size: 17px;
   line-height: 1.7;
-  color: #64748b;
+  color: var(--app-text-secondary);
   margin: 0 0 40px;
 }
 .hero-cta {
@@ -228,13 +297,13 @@
   gap: 10px;
   padding: 16px 36px;
   border-radius: 100px;
-  background: #0f172a;
-  color: #ffffff;
+  background-image: var(--app-brand-gradient);
+  color: #071018;
   font-size: 16px;
   font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
-  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 10px 28px -8px rgba(107, 139, 255, 0.6);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 .cta-arrow {
   font-size: 18px;
@@ -242,7 +311,8 @@
 }
 .cta-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.35);
+  filter: brightness(1.08);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset, 0 16px 36px -8px rgba(107, 139, 255, 0.7);
 }
 .cta-btn:hover .cta-arrow {
   transform: translateX(4px);

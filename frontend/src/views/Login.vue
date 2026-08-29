@@ -1,5 +1,13 @@
 <template>
   <div class="auth-page">
+    <!-- 液态极光背景 -->
+    <div class="aurora" aria-hidden="true">
+      <span class="blob blob-cyan"></span>
+      <span class="blob blob-blue"></span>
+      <span class="blob blob-amber"></span>
+      <span class="grid-overlay"></span>
+    </div>
+
     <div class="auth-wrap">
       <!-- Logo -->
       <div class="auth-logo">
@@ -160,15 +168,72 @@ async function onRegister() {
 
 <style scoped>
 .auth-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  background: linear-gradient(145deg, #eaf4ff 0%, #f3f8ff 35%, #f8fbff 65%, #ffffff 100%);
+  background: linear-gradient(180deg, #080b14 0%, #05070e 100%);
+}
+
+/* ---------- 液态极光背景 ---------- */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 800px at 15% -10%, rgba(107, 139, 255, 0.14), transparent 60%),
+    radial-gradient(1000px 700px at 110% 10%, rgba(90, 208, 230, 0.12), transparent 55%),
+    linear-gradient(180deg, #080b14 0%, #05070e 100%);
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.blob-cyan {
+  width: 46vw;
+  height: 46vw;
+  left: -8vw;
+  top: -6vw;
+  background: radial-gradient(circle at 30% 30%, rgba(90, 208, 230, 0.6), transparent 70%);
+  animation: app-blob 20s var(--ease-in-out) infinite;
+}
+.blob-blue {
+  width: 42vw;
+  height: 42vw;
+  right: -10vw;
+  top: 4vw;
+  background: radial-gradient(circle at 60% 40%, rgba(107, 139, 255, 0.55), transparent 70%);
+  animation: app-blob-2 24s var(--ease-in-out) infinite;
+}
+.blob-amber {
+  width: 34vw;
+  height: 34vw;
+  left: 30vw;
+  bottom: -14vw;
+  background: radial-gradient(circle at 50% 50%, rgba(242, 193, 78, 0.28), transparent 70%);
+  animation: app-blob 28s var(--ease-in-out) infinite reverse;
+}
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 80%);
 }
 
 .auth-wrap {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 420px;
 }
@@ -188,26 +253,27 @@ async function onRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0f172a;
-  color: #fff;
+  background: var(--app-brand-gradient);
+  color: #071018;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 6px 18px -6px rgba(90, 208, 230, 0.6);
 }
 .logo-name {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
   letter-spacing: 0.3px;
 }
 
-/* 表单卡片 */
+/* 表单卡片 - 玻璃拟态 */
 .panel-card {
   width: 100%;
-  background: #ffffff;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 28px;
   padding: 40px 36px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.02),
-    0 4px 12px rgba(0, 0, 0, 0.03),
-    0 20px 60px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   animation: fadeUp 0.5s ease both;
 }
 @keyframes fadeUp {
@@ -222,13 +288,13 @@ async function onRegister() {
 .panel-title {
   font-size: 24px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--app-text);
   letter-spacing: -0.2px;
 }
 .panel-sub {
   margin-top: 6px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--app-text-secondary);
 }
 
 /* Tab 切换 */
@@ -236,7 +302,8 @@ async function onRegister() {
   position: relative;
   display: flex;
   gap: 4px;
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 4px;
   margin-bottom: 24px;
@@ -245,9 +312,9 @@ async function onRegister() {
   position: absolute;
   left: 4px; top: 4px; bottom: 4px;
   width: calc(50% - 4px);
-  background: #ffffff;
+  background: var(--glass-bg-strong);
   border-radius: 11px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 0;
 }
@@ -264,31 +331,21 @@ async function onRegister() {
   background: transparent;
   font-size: 14px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--app-text-muted);
   cursor: pointer;
   transition: color 0.25s ease;
 }
 .tab-btn.active {
-  color: #0f172a;
+  color: var(--app-text);
 }
 
 /* 输入框 */
 .panel-card :deep(.el-input__wrapper) {
   border-radius: 14px;
   padding: 2px 16px;
-  box-shadow: 0 0 0 1px #e2e8f0 inset;
-  transition: box-shadow 0.2s ease, background 0.2s ease;
-  background: #f8fafc;
-}
-.panel-card :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1.5px #0f172a inset, 0 0 0 4px rgba(15, 23, 42, 0.06);
-  background: #ffffff;
-}
-.panel-card :deep(.el-form-item) {
-  margin-bottom: 18px;
 }
 
-/* 提交按钮 - 黑色 pill */
+/* 提交按钮 - 青蓝渐变 */
 .submit-btn {
   width: 100%;
   height: 48px;
@@ -297,19 +354,19 @@ async function onRegister() {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
-  background: #0f172a;
+  background-image: var(--app-brand-gradient);
   border: none;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
-  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+  color: #071018;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 10px 28px -10px rgba(107, 139, 255, 0.6);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 .submit-btn:active {
   transform: scale(0.97);
 }
 @media (hover: hover) and (pointer: fine) {
   .submit-btn:hover {
-    background: #1e293b;
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.35);
+    filter: brightness(1.08);
+    box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset, 0 16px 38px -10px rgba(107, 139, 255, 0.7);
   }
 }
 </style>
