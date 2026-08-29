@@ -472,4 +472,20 @@ onMounted(load)
   height: 10px;
   border-radius: 50%;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.section-title { color: var(--app-text); }
+.dim-label,
+.skill-name,
+.legend-item { color: var(--app-text-secondary); }
+.dim-score { color: var(--app-cyan); }
+.skill-score { color: var(--app-text); }
+.advice-block {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+}
+.advice-title.ok { color: var(--app-success); }
+.advice-title.warn { color: var(--app-amber); }
+.advice-item.ok .advice-badge { color: var(--app-success); }
+.advice-item.warn .advice-badge { color: var(--app-amber); }
 </style>
