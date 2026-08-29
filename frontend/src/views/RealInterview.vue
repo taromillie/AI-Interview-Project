@@ -428,7 +428,7 @@ async function runReview() {
 }
 
 async function removeRecord(r) {
-  await ElMessageBox.confirm(`确定删除 ${r.company} 的面试记录？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除 ${r.company} 的面试记��？`, '提示', { type: 'warning' })
   await deleteRealInterview(r.id)
   if (current.value && current.value.id === r.id) current.value = null
   ElMessage.success('已删除')
@@ -842,4 +842,64 @@ onMounted(() => {
   box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.06));
   padding: 40px 0;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.wizard,
+.w-card,
+.result-head,
+.result-card,
+.empty-review {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.w-dot { background: rgba(255, 255, 255, 0.06); border: 2px solid var(--app-border); }
+.w-step.active .w-dot {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 0 0 5px rgba(90, 208, 230, 0.16), 0 6px 16px -4px rgba(107, 139, 255, 0.5);
+}
+.w-step.done .w-dot {
+  color: #071018;
+  background: linear-gradient(135deg, #43d9a3, #2fb589);
+  box-shadow: 0 0 0 5px rgba(67, 217, 163, 0.16);
+}
+.w-step.active .w-label { color: var(--app-cyan); }
+.w-line.done { background: linear-gradient(90deg, #43d9a3, #5ad0e6); }
+.w-ico {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 6px 14px -4px rgba(90, 208, 230, 0.5);
+}
+.w-ico.grad { background: linear-gradient(135deg, #6b8bff, #8b6bff); }
+.w-ico.green { background: linear-gradient(135deg, #43d9a3, #2fb589); }
+.qa-item,
+.item-review {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+}
+.qa-no {
+  color: var(--app-cyan);
+  background: var(--app-brand-soft);
+}
+.start-summary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+.history-item { background: rgba(255, 255, 255, 0.04); }
+.history-item:hover { border-color: rgba(90, 208, 230, 0.4); }
+.route-from { color: var(--app-cyan); }
+.rc-ico { color: #071018; }
+.rc-ico.blue { background: var(--app-brand-gradient); }
+.rc-ico.green { background: linear-gradient(135deg, #43d9a3, #2fb589); }
+.d-label { color: var(--app-text-secondary); }
+.summary-box {
+  background: var(--app-brand-soft);
+  border: 1px solid rgba(90, 208, 230, 0.25);
+  color: var(--app-text);
+}
+.ir-q { color: var(--app-text); }
+.suggestion-item { color: var(--app-text-secondary); }
 </style>

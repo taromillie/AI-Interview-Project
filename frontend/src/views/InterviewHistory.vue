@@ -484,4 +484,59 @@ onMounted(load)
   color: #92400e;
   font-size: 14px;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.page-head {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+}
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    box-shadow: var(--glass-highlight), var(--glass-shadow);
+    border-color: rgba(90, 208, 230, 0.4);
+  }
+}
+.score { color: var(--app-cyan); }
+.overview {
+  background: var(--app-brand-soft);
+  border: 1px solid rgba(90, 208, 230, 0.25);
+}
+.section-title {
+  border-left: 3px solid var(--app-cyan);
+}
+.msg {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+}
+.msg.user {
+  background: var(--app-brand-soft);
+  border-color: rgba(90, 208, 230, 0.25);
+}
+.msg.user .msg-role { color: var(--app-cyan); }
+.report-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+.dim-val { color: var(--app-cyan); }
+.weak-title { color: var(--app-danger); }
+.rep-item {
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.rep-comment { color: var(--app-text-secondary); }
+.no-report {
+  background: rgba(242, 193, 78, 0.1);
+  border: 1px dashed rgba(242, 193, 78, 0.5);
+  color: var(--app-amber);
+}
 </style>
