@@ -47,3 +47,8 @@ logs/
 
 # CodeBuddy 项目数据（勿提交）
 .codebuddy/
+
+# 前端副本 / 备份与临时产物
+frontend - 副本/
+*.db.bak-*
+c931ba8045cc99fb14e26729656bd605.jpg

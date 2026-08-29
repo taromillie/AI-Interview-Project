@@ -34,6 +34,23 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
+# 随机 User-Agent 池：每次请求轮换，降低按 UA 指纹被站点识别的概率
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
+]
+
+
+def random_user_agent() -> str:
+    """随机返回一个浏览器 UA。"""
+    return random.choice(_USER_AGENTS)
+
 # 方向关键词 → 方向
 _DIRECTION_RULES: list[tuple[list[str], str]] = [
     (["前端", "html", "css", "javascript", "vue", "react", "web", "h5", "小程序", "webgl"], "frontend"),
@@ -41,7 +58,8 @@ _DIRECTION_RULES: list[tuple[list[str], str]] = [
     (["产品", "需求", "pm", "项目", "项目经理", "策划"], "product"),
     (["运营", "增长", "用户运营", "内容", "社群", "渠道", "直播", "新媒体"], "operations"),
     (["数据", "数仓", "etl", "bi", "分析师", "spark", "flink", "hive", "数据开发"], "data"),
-    (["后端", "服务端", "java", "go", "golang", "python", "php", "c++", "c#", "node", "测试", "运维", "devops", "架构", "研发"], "backend"),
+    (["后端", "服务端", "java", "go", "golang", "python", "php", "c++", "c#", "node", "测试", "运维", "devops", "架构", "研发",
+      "backend", "developer", "engineer", "software", "sre", "fullstack", "full-stack", "django", "spring", "devops", "infrastructure"], "backend"),
 ]
 # 难度关键词 → 难度
 _JUNIOR_KW = ["实习", "初级", "助理", "应届", "校招", "junior", "1年以下", "1-3年"]
@@ -55,6 +73,13 @@ _SKILL_KW = [
     "linux", "docker", "k8s", "kubernetes", "微服务", "分布式", "消息队列", "elasticsearch", "nginx",
     "数据分析", "excel", "tableau", "ab测试", "用户增长", "内容运营", "社群运营", "私域",
     "产品设计", "axure", "prd", "项目管理", "需求分析", "用户研究",
+    # 英文技能词（公开职位 API 数据源）
+    "aws", "azure", "gcp", "devops", "ci/cd", "terraform", "ansible", "postgres", "postgresql",
+    "mongodb", "graphql", "angular", "svelte", "next.js", "nuxt", "ruby", "rails", "swift",
+    "kotlin", "django", "flask", "fastapi", "scala", "react native", "flutter", "tailwind",
+    "microservices", "kubernetes", "docker", "redis", "rabbitmq", "elasticsearch", "nginx",
+    "typescript", "javascript", "html", "css", "webpack", "vite", "git", "linux",
+    "pytorch", "tensorflow", "scikit-learn", "keras", "langchain", "llm", "mlops", "spark", "flink",
 ]
 # 福利关键词
 _WELFARE_KW = [
@@ -316,10 +341,53 @@ class JobuiSource:
     ]
     CITIES = ["北京", "上海", "深圳", "杭州", "广州", "成都"]
 
+    # 反爬限速参数：爬几个歇几秒，模拟人工浏览，避免触发站点风控
+    REQUEST_INTERVAL = (3.0, 6.0)      # 每次请求后的随机间隔（秒）
+    LONG_BREAK_EVERY = 5               # 每 N 个请求后长休息一次
+    LONG_BREAK_RANGE = (15.0, 30.0)    # 长休息时长（秒）
+    RETRY = 1                          # 网络异常/风控信号后的重试次数
+
     def __init__(self, max_pages: int = 1, max_cities: int = 4) -> None:
         self.max_pages = max_pages
         self.max_cities = max_cities
         self.guard = RobotsGuard(self.BASE)
+        self._req_count = 0  # 本轮已发请求数（用于决定何时长休息）
+
+    # ---- 限速 ----
+    def _throttle(self, long: bool = False) -> None:
+        """普通间隔 3~6 秒；长休息 15~30 秒。"""
+        time.sleep(random.uniform(*(self.LONG_BREAK_RANGE if long else self.REQUEST_INTERVAL)))
+
+    def _should_long_break(self) -> bool:
+        return self._req_count > 0 and self._req_count % self.LONG_BREAK_EVERY == 0
+
+    def _request(self, client: httpx.Client, url: str, params: dict) -> httpx.Response:
+        """带重试与退避的 GET：轮换 UA，遇 403/429/503 等风控信号时长退避后重试。"""
+        self._req_count += 1
+        headers = {
+            "User-Agent": random_user_agent(),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Referer": f"{self.BASE}/jobs",
+            "Connection": "keep-alive",
+        }
+        last_resp: httpx.Response | None = None
+        for attempt in range(self.RETRY + 1):
+            try:
+                last_resp = client.get(url, params=params, headers=headers)
+            except httpx.HTTPError as exc:
+                logger.warning("[jobui] 请求异常 %s (attempt=%s): %s", url, attempt, exc)
+                if attempt < self.RETRY:
+                    time.sleep(random.uniform(6.0, 12.0))
+                    continue
+                raise
+            if last_resp.status_code in (403, 429, 503):
+                logger.warning("[jobui] 触发风控 HTTP %s (attempt=%s)，长退避后重试", last_resp.status_code, attempt)
+                if attempt < self.RETRY:
+                    time.sleep(random.uniform(20.0, 40.0))
+                    continue
+            return last_resp
+        return last_resp
 
     def fetch_jobs(self) -> list[JobItem]:
         items: list[JobItem] = []
@@ -329,7 +397,11 @@ class JobuiSource:
                     items.extend(self._fetch_page(kw, city))
                 except Exception as exc:
                     logger.warning("[jobui] %s/%s 采集失败: %s", city, kw, exc)
-                RobotsGuard.polite_sleep()
+                if self._should_long_break():
+                    logger.info("[jobui] 已连续请求 %s 次，长休息 %s~%s 秒", self._req_count, *self.LONG_BREAK_RANGE)
+                    self._throttle(long=True)
+                else:
+                    self._throttle()
         logger.info("[jobui] 本轮采集完成，共 %s 条", len(items))
         return items
 
@@ -345,11 +417,11 @@ class JobuiSource:
                 params["page"] = page + 1
             try:
                 with httpx.Client(timeout=15, follow_redirects=True, headers={
-                    "User-Agent": USER_AGENT,
+                    "User-Agent": random_user_agent(),
                     "Accept": "text/html,application/xhtml+xml",
                     "Accept-Language": "zh-CN,zh;q=0.9",
                 }) as client:
-                    resp = client.get(f"{self.BASE}{path}", params=params)
+                    resp = self._request(client, f"{self.BASE}{path}", params)
                 if resp.status_code != 200:
                     logger.warning("[jobui] HTTP %s for %s/%s page=%s", resp.status_code, city, kw, page)
                     break
@@ -361,7 +433,7 @@ class JobuiSource:
                 logger.warning("[jobui] 请求异常 %s/%s page=%s: %s", city, kw, page, exc)
                 break
             if page < self.max_pages - 1:
-                RobotsGuard.polite_sleep()
+                self._throttle()
         return items
 
     def _parse_list(self, html: str, city: str) -> list[JobItem]:
@@ -442,16 +514,249 @@ class JobuiSource:
 
 
 # ---------------------------------------------------------------------------
+# 公开职位 API 数据源（免 key、合规，岗位为真实招聘数据）
+# ---------------------------------------------------------------------------
+def _parse_api_date(text) -> datetime | None:
+    """兼容 '2026-08-20 12:00:00' / '2026-08-20' / '2026-08-20T..' / unix 时间戳。"""
+    if not text:
+        return None
+    text = str(text).strip()
+    if text.isdigit():
+        try:
+            return datetime.utcfromtimestamp(int(text))
+        except Exception:
+            return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d",
+                "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f"):
+        try:
+            return datetime.strptime(text[:26], fmt)
+        except Exception:
+            continue
+    return None
+
+
+# 公开 API 岗位方向词表（标题强匹配，按优先级排序）
+_API_TITLE_WORDS: dict[str, list[str]] = {
+    "algorithm": [
+        "machine learning", "deep learning", "data scientist", "data science", "algorithm",
+        "computer vision", "nlp", "llm", "mlops", "ml engineer", "artificial intelligence",
+        "research engineer", "research scientist", "ai engineer", "ai architect",
+    ],
+    "data": [
+        "data engineer", "data analyst", "data warehouse", "etl", "business intelligence",
+        "analytics", "database", "sql", "spark", "hadoop", "data platform", "big data",
+        "data architect", "dba", "data visualization", "bi developer",
+    ],
+    "frontend": [
+        "frontend", "front-end", "front end", "react", "vue", "angular", "javascript",
+        "typescript", "html", "css", "web developer", "ui engineer",
+        "ui developer", "ux engineer",
+    ],
+    "backend": [
+        "backend", "back-end", "back end", "devops", "sre", "site reliability",
+        "full-stack", "fullstack", "software engineer", "software developer",
+        "golang", "go developer", "python developer", "java developer", "node.js",
+        "nodejs", "rust", "php", "dotnet", ".net", "c#", "java", "python",
+        "cloud engineer", "platform engineer", "infrastructure", "systems engineer",
+        "qa", "test automation", "tester", "microservices", "api developer",
+        "engineer", "developer", "architect", "programmer", "software",
+    ],
+}
+# 公开 API tags 辅助匹配（仅强方向词，避免 sql/python/java 等单技能词导致非技术岗误判）
+_API_TAG_WORDS: dict[str, list[str]] = {
+    "algorithm": ["machine learning", "deep learning", "data science", "artificial intelligence", "computer vision", "mlops", "nlp"],
+    "data": ["data engineer", "data analyst", "data warehouse", "etl", "big data", "analytics", "database"],
+    "frontend": ["frontend", "front-end", "front end", "react", "vue", "angular", "javascript", "typescript", "html", "css"],
+    "backend": ["backend", "back-end", "back end", "devops", "sre", "fullstack", "full-stack", "software", "golang", "node.js", ".net", "dotnet", "microservices", "kubernetes", "infrastructure"],
+}
+# 公开 API 仅保留技术岗
+_API_TECH_DIRECTIONS = {"frontend", "backend", "algorithm", "data"}
+
+
+def _clean_tags(tags) -> list[str]:
+    """清洗 tags（兼容嵌套 list 与 None）。"""
+    out: list[str] = []
+    for t in tags or []:
+        if isinstance(t, (list, tuple)):
+            out.extend(_clean_tags(t))
+        elif isinstance(t, str):
+            t = t.strip()
+            if t:
+                out.append(t)
+    return out
+
+
+class _OpenApiJobSource:
+    """公开职位 API 数据源基类。子类只需实现 _parse(data) -> list[JobItem]。"""
+
+    name = "openapi"
+    api_url = ""
+    _headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+
+    def fetch_jobs(self) -> list[JobItem]:
+        items: list[JobItem] = []
+        try:
+            with httpx.Client(timeout=25, follow_redirects=True, headers=self._headers) as client:
+                resp = client.get(self.api_url)
+            if resp.status_code != 200:
+                logger.warning("[%s] HTTP %s", self.name, resp.status_code)
+                return []
+            items = self._parse(resp.json())
+        except Exception as exc:
+            logger.warning("[%s] 采集失败: %s", self.name, exc)
+        logger.info("[%s] 本轮采集完成，共 %s 条", self.name, len(items))
+        return items
+
+    def _parse(self, data: dict) -> list[JobItem]:
+        raise NotImplementedError
+
+    @staticmethod
+    def _infer_direction(title: str, tags) -> str:
+        # 仅依据标题判定方向：技术岗标题必然包含技术词，可避免 tags 弱词误判非技术岗
+        t = (title or "").lower()
+        for direction, words in _API_TITLE_WORDS.items():
+            if any(w in t for w in words):
+                return direction
+        return "tech"
+
+    def _make_item(
+        self, name, company, city, url, source_id, tags,
+        description="", salary_min=None, salary_max=None, published=None,
+    ) -> JobItem | None:
+        name = (name or "").strip()
+        if not name:
+            return None
+        tags = _clean_tags(tags)
+        direction = self._infer_direction(name, tags)
+        if direction not in _API_TECH_DIRECTIONS:
+            # 公开 API 仅保留技术岗位，避免非技术岗混入岗位广场
+            return None
+        hint = f"{name} {' '.join(tags)}".lower()
+        difficulty = infer_difficulty(hint)
+        skills = extract_skills(hint) or default_skills(direction)
+        base = JobItem(name=name, direction=direction, difficulty=difficulty, skills=skills)
+        return JobItem(
+            name=name, direction=direction, difficulty=difficulty, skills=skills,
+            company=company or "", city=city or "",
+            salary_min=salary_min, salary_max=salary_max,
+            description=description or build_description(base),
+            welfare=[], source=self.name,
+            source_id=str(source_id) if source_id is not None else None,
+            source_url=url or "", published_at=published,
+        )
+
+
+class RemotiveSource(_OpenApiJobSource):
+    """Remotive：公开远程职位 API（免 key）。"""
+    name = "remotive"
+    api_url = "https://remotive.com/api/remote-jobs?limit=120"
+
+    def _parse(self, data: dict) -> list[JobItem]:
+        out = []
+        for j in data.get("jobs") or []:
+            out.append(self._make_item(
+                name=j.get("title"), company=j.get("company_name"),
+                city=j.get("candidate_required_location"),
+                url=j.get("url"), source_id=j.get("id"),
+                tags=j.get("tags") or [], description=j.get("description") or "",
+                published=_parse_api_date(j.get("publication_date")),
+            ))
+        return [o for o in out if o]
+
+
+class JobicySource(_OpenApiJobSource):
+    """Jobicy：公开远程职位 API（免 key）。"""
+    name = "jobicy"
+    api_url = "https://jobicy.com/api/v2/remote-jobs?count=100"
+
+    def _parse(self, data: dict) -> list[JobItem]:
+        out = []
+        for j in data.get("jobs") or []:
+            geo = j.get("jobGeo")
+            city = geo if isinstance(geo, str) else ", ".join(geo or [])
+            tags = list(j.get("jobIndustry") or []) + list(j.get("jobType") or [])
+            out.append(self._make_item(
+                name=j.get("jobTitle"), company=j.get("companyName"),
+                city=city,
+                url=j.get("url"), source_id=j.get("id"),
+                tags=tags,
+                description=j.get("jobDescription") or j.get("jobExcerpt") or "",
+                published=_parse_api_date(j.get("pubDate")),
+            ))
+        return [o for o in out if o]
+
+
+class ArbeitnowSource(_OpenApiJobSource):
+    """Arbeitnow：公开职位 API（免 key，覆盖欧洲为主）。"""
+    name = "arbeitnow"
+    api_url = "https://www.arbeitnow.com/api/job-board-api?limit=300"
+
+    def _parse(self, data: dict) -> list[JobItem]:
+        out = []
+        for j in data.get("data") or []:
+            out.append(self._make_item(
+                name=j.get("title"), company=j.get("company_name"),
+                city=j.get("location"),
+                url=j.get("url"), source_id=j.get("slug"),
+                tags=j.get("tags") or [], description=j.get("description") or "",
+                published=_parse_api_date(j.get("created_at")),
+            ))
+        return [o for o in out if o]
+
+
+def _money_to_k(value) -> int | None:
+    """API 薪资转 K（Himalayas 为年薪美元）。"""
+    try:
+        v = float(value)
+        if v >= 10000:
+            return int(v // 1000)
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+class HimalayasSource(_OpenApiJobSource):
+    """Himalayas：公开远程职位 API（免 key，固定返回最近 20 条）。"""
+    name = "himalayas"
+    api_url = "https://himalayas.app/jobs/api"
+
+    def _parse(self, data: dict) -> list[JobItem]:
+        out = []
+        for i, j in enumerate(data.get("jobs") or []):
+            tags = (list(j.get("categories") or []) + [j.get("seniority") or ""]
+                    + list(j.get("employmentType") or []))
+            sid = j.get("id") or j.get("url") or f"{j.get('companySlug') or 'h'}-{i}"
+            out.append(self._make_item(
+                name=j.get("title"), company=j.get("companyName"),
+                city=", ".join(j.get("locationRestrictions") or [])[:80],
+                url=j.get("url") or "", source_id=sid,
+                tags=[t for t in tags if t],
+                salary_min=_money_to_k(j.get("minSalary")),
+                salary_max=_money_to_k(j.get("maxSalary")),
+                published=None,
+            ))
+        return [o for o in out if o]
+
+
+# ---------------------------------------------------------------------------
 # 同步编排
 # ---------------------------------------------------------------------------
-def build_sources(enabled: str = "builtin,jobui") -> list[JobSource]:
+def build_sources(enabled: str = "remotive,jobicy,arbeitnow") -> list[JobSource]:
     sources: list[JobSource] = []
     for name in (s.strip() for s in enabled.split(",") if s.strip()):
         if name == "builtin":
             sources.append(BuiltinSource())
         elif name in ("jobui", "zhaopin", "liepin"):
-            # 统一映射：职友集为当前真实数据源
+            # 职友集（中国真实岗位，限速采集 + robots 合规检查）
             sources.append(JobuiSource())
+        elif name == "remotive":
+            sources.append(RemotiveSource())
+        elif name == "jobicy":
+            sources.append(JobicySource())
+        elif name == "arbeitnow":
+            sources.append(ArbeitnowSource())
+        elif name == "himalayas":
+            sources.append(HimalayasSource())
     return sources
 
 

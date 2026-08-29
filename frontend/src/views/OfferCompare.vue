@@ -581,4 +581,48 @@ onMounted(() => {
   line-height: 1.8;
   white-space: pre-wrap;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.wizard,
+.w-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.w-dot { background: rgba(255, 255, 255, 0.06); border: 2px solid var(--app-border); }
+.w-step.active .w-dot {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 0 0 5px rgba(90, 208, 230, 0.16), 0 6px 16px -4px rgba(107, 139, 255, 0.5);
+}
+.w-step.done .w-dot {
+  color: #071018;
+  background: linear-gradient(135deg, #43d9a3, #2fb589);
+  box-shadow: 0 0 0 5px rgba(67, 217, 163, 0.16);
+}
+.w-step.active .w-label { color: var(--app-cyan); }
+.w-line.done { background: linear-gradient(90deg, #43d9a3, #5ad0e6); }
+.w-ico {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 6px 14px -4px rgba(90, 208, 230, 0.5);
+}
+.w-ico.green { background: linear-gradient(135deg, #43d9a3, #2fb589); }
+.offer-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+}
+.offer-item:hover { border-color: rgba(90, 208, 230, 0.4); }
+.offer-title { color: var(--app-text); }
+.offer-sub { color: var(--app-text-secondary); }
+.best { color: var(--app-success); }
+.total { color: var(--app-text); }
+.section-title { color: var(--app-text); }
+.analysis-box {
+  background: var(--app-brand-soft);
+  border: 1px solid rgba(90, 208, 230, 0.25);
+  color: var(--app-text);
+}
 </style>

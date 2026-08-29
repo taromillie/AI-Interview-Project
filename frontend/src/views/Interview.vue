@@ -1105,4 +1105,152 @@ onMounted(async () => {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.wizard {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.w-dot {
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid var(--app-border);
+}
+.w-step.active .w-dot {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 0 0 5px rgba(90, 208, 230, 0.16), 0 6px 16px -4px rgba(107, 139, 255, 0.5);
+}
+.w-step.done .w-dot {
+  color: #071018;
+  background: linear-gradient(135deg, #43d9a3, #2fb589);
+  box-shadow: 0 0 0 5px rgba(67, 217, 163, 0.16);
+}
+.w-step.active .w-label { color: var(--app-cyan); }
+.w-line.done { background: linear-gradient(90deg, #43d9a3, #5ad0e6); }
+
+.w-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-md);
+}
+.w-ico {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 6px 14px -4px rgba(90, 208, 230, 0.5);
+}
+.w-ico.grad {
+  background: linear-gradient(135deg, #6b8bff, #8b6bff);
+  box-shadow: 0 6px 14px -4px rgba(107, 139, 255, 0.5);
+}
+.w-ico.green {
+  background: linear-gradient(135deg, #43d9a3, #2fb589);
+  box-shadow: 0 6px 14px -4px rgba(67, 217, 163, 0.45);
+}
+
+.opt-company { color: var(--app-text); }
+.opt-position { color: var(--app-text-secondary); }
+.opt-meta { color: var(--app-text-muted); }
+
+.iv-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1.5px solid var(--app-border);
+}
+.iv-card:hover {
+  border-color: rgba(107, 139, 255, 0.5);
+  box-shadow: var(--glass-highlight);
+}
+.iv-card.on {
+  border-color: var(--app-cyan);
+  background: var(--app-brand-soft);
+  box-shadow: 0 0 0 4px rgba(90, 208, 230, 0.14);
+}
+.iv-avatar {
+  color: #071018;
+  background: var(--app-brand-gradient);
+}
+.iv-check { color: var(--app-cyan); }
+.iv-tag {
+  color: var(--app-text-secondary);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.diff-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1.5px solid var(--app-border);
+}
+.diff-card:hover {
+  border-color: rgba(67, 217, 163, 0.5);
+}
+.diff-card.on {
+  border-color: var(--app-success);
+  background: rgba(67, 217, 163, 0.1);
+  box-shadow: 0 0 0 4px rgba(67, 217, 163, 0.1);
+}
+.start-summary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+/* 对话区玻璃化 */
+.chat-shell {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-md);
+}
+.tool-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+}
+.tool-btn:hover { border-color: rgba(90, 208, 230, 0.5); color: var(--app-text); }
+.tool-btn.on { color: #071018; background: var(--app-brand-gradient); border-color: transparent; }
+.mic-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+}
+.mic-btn:hover:not(:disabled) { border-color: rgba(90, 208, 230, 0.5); color: var(--app-text); }
+.mic-btn.on {
+  color: #fff;
+  background: #ff6b7a;
+  border-color: #ff6b7a;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 122, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 107, 122, 0); }
+}
+.chat-body {
+  background: rgba(5, 7, 14, 0.28);
+}
+.ai-avatar {
+  color: #071018;
+  background: var(--app-brand-gradient);
+}
+.ai-bubble {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+}
+.user-bubble {
+  background: var(--app-brand-gradient);
+  color: #071018;
+  font-weight: 500;
+}
+.chat-input {
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid var(--app-border);
+}
+.send-btn {
+  background: var(--app-brand-gradient);
+  color: #071018;
+}
 </style>

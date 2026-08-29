@@ -138,6 +138,7 @@ const STATUS_TYPE = { draft: 'info', published: 'success', archived: 'warning' }
 const positions = ref([])
 const atoms = ref([])
 const positionId = ref(null)
+const keyword = ref('')
 
 function positionLabel(p) {
   return p.company ? `${p.company} ${p.name}` : p.name
@@ -230,6 +231,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 .filters {
   display: flex;
@@ -237,6 +239,11 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 14px;
   flex-wrap: wrap;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 .tag {
   margin-right: 4px;

@@ -307,4 +307,19 @@ onMounted(load)
 .qf-answer {
   margin-bottom: 8px;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.overall-num { color: var(--app-cyan); }
+.cov-block.covered {
+  background: rgba(67, 217, 163, 0.1);
+  border: 1px solid rgba(67, 217, 163, 0.25);
+}
+.cov-block.uncovered {
+  background: rgba(255, 107, 122, 0.1);
+  border: 1px solid rgba(255, 107, 122, 0.25);
+}
+.cov-title { color: var(--app-text); }
+.lp-item { color: var(--app-text-secondary); }
+.lp-phase { color: var(--app-text); }
+.qf-body { color: var(--app-text-secondary); }
 </style>

@@ -720,4 +720,65 @@ onMounted(() => {
   color: #1f2937;
   line-height: 1.6;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.wizard,
+.w-card,
+.result-head,
+.result-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.w-dot { background: rgba(255, 255, 255, 0.06); border: 2px solid var(--app-border); }
+.w-step.active .w-dot {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 0 0 5px rgba(90, 208, 230, 0.16), 0 6px 16px -4px rgba(107, 139, 255, 0.5);
+}
+.w-step.done .w-dot {
+  color: #071018;
+  background: linear-gradient(135deg, #43d9a3, #2fb589);
+  box-shadow: 0 0 0 5px rgba(67, 217, 163, 0.16);
+}
+.w-step.active .w-label { color: var(--app-cyan); }
+.w-line.done { background: linear-gradient(90deg, #43d9a3, #5ad0e6); }
+.w-ico {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 6px 14px -4px rgba(90, 208, 230, 0.5);
+}
+.w-ico.grad { background: linear-gradient(135deg, #6b8bff, #8b6bff); }
+.w-ico.green { background: linear-gradient(135deg, #43d9a3, #2fb589); }
+.start-summary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+.history-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--app-border);
+}
+.history-item:hover { border-color: rgba(90, 208, 230, 0.4); }
+.route-arrow { color: var(--app-cyan); }
+.route-from { color: var(--app-text-secondary); }
+.route-to {
+  color: var(--app-cyan);
+  background: var(--app-brand-soft);
+}
+.rc-ico { color: #071018; }
+.rc-ico.blue { background: var(--app-brand-gradient); }
+.rc-ico.green { background: linear-gradient(135deg, #43d9a3, #2fb589); }
+.rc-ico.orange { background: linear-gradient(135deg, #f2c14e, #e0982f); }
+.range-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+}
+.range-card.main {
+  border-color: var(--app-cyan);
+  background: var(--app-brand-soft);
+}
+.range-card.main .range-value { color: var(--app-cyan); }
+.strategy-item { color: var(--app-text-secondary); }
 </style>

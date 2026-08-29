@@ -334,6 +334,7 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 .chart-wrap {
   display: flex;
@@ -343,12 +344,48 @@ onMounted(load)
 .radar {
   max-width: 420px;
   width: 100%;
+  filter: drop-shadow(0 8px 22px rgba(90, 208, 230, 0.12));
+}
+/* 雷达网格 / 轴线：暗色玻璃细线 */
+.radar polygon,
+.radar line {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+/* 数据多边形：青蓝液态玻璃填充 */
+.radar polygon[fill^="rgba"] {
+  fill: rgba(90, 208, 230, 0.24);
+  stroke: var(--app-cyan);
+  stroke-width: 2;
+}
+/* 数据点 */
+.radar circle {
+  fill: var(--app-cyan);
+  stroke: #fff;
+  stroke-width: 2;
+}
+/* 维度标签 */
+.radar text[fill="#303133"] {
+  fill: var(--app-text);
+}
+/* 数值 */
+.radar text[fill="#409eff"] {
+  fill: var(--app-cyan);
 }
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--app-text);
   margin: 8px 0 12px;
+}
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--app-brand-gradient);
 }
 .dim-row {
   display: flex;
@@ -359,7 +396,7 @@ onMounted(load)
 .dim-label {
   width: 72px;
   font-size: 13px;
-  color: #606266;
+  color: var(--app-text-secondary);
   flex-shrink: 0;
 }
 .dim-bar {
@@ -370,7 +407,7 @@ onMounted(load)
   text-align: right;
   font-size: 13px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--app-cyan);
 }
 .skill-grid {
   display: grid;
@@ -385,7 +422,7 @@ onMounted(load)
 .skill-name {
   width: 110px;
   font-size: 13px;
-  color: #606266;
+  color: var(--app-text-secondary);
   flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -398,7 +435,7 @@ onMounted(load)
   width: 30px;
   font-size: 13px;
   font-weight: 600;
-  color: #303133;
+  color: var(--app-text);
   text-align: right;
 }
 .weak-list {
@@ -410,11 +447,14 @@ onMounted(load)
   font-size: 13px;
 }
 .advice-block {
-  background: #fbfdff;
-  border: 1px solid #eef2f7;
-  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
   padding: 14px 16px;
   min-height: 120px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 .advice-title {
   font-size: 14px;
@@ -422,10 +462,10 @@ onMounted(load)
   margin-bottom: 10px;
 }
 .advice-title.ok {
-  color: #16a34a;
+  color: var(--app-success);
 }
 .advice-title.warn {
-  color: #d97706;
+  color: var(--app-warning);
 }
 .advice-item {
   display: flex;
@@ -436,10 +476,10 @@ onMounted(load)
   padding: 4px 0;
 }
 .advice-item.ok .advice-badge {
-  color: #16a34a;
+  color: var(--app-success);
 }
 .advice-item.warn .advice-badge {
-  color: #d97706;
+  color: var(--app-warning);
 }
 .advice-badge {
   flex-shrink: 0;
@@ -454,6 +494,30 @@ onMounted(load)
   display: block;
   margin: 0 auto;
 }
+/* 趋势网格线 */
+.trend line {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+/* 趋势折线：主题化配色（固定 dims 顺序 tech/expression/logic/project） */
+.trend > path {
+  stroke: var(--app-cyan);
+  stroke-width: 2.5;
+}
+.trend > path:nth-child(10) {
+  stroke: #8aa2ff;
+}
+.trend > path:nth-child(11) {
+  stroke: var(--app-success);
+}
+.trend > path:nth-child(12) {
+  stroke: var(--app-warning);
+}
+/* 趋势数据点 */
+.trend circle {
+  fill: var(--app-cyan);
+  stroke: #fff;
+  stroke-width: 2;
+}
 .trend-legend {
   display: flex;
   justify-content: center;
@@ -465,11 +529,12 @@ onMounted(load)
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #606266;
+  color: var(--app-text-secondary);
 }
 .legend-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
 }
 </style>

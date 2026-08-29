@@ -891,4 +891,136 @@ onUnmounted(() => {
     gap: 12px;
   }
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.search-bar {
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.search-bar:focus-within {
+  border-color: rgba(90, 208, 230, 0.6);
+  box-shadow: 0 0 0 4px rgba(90, 208, 230, 0.14), var(--glass-highlight);
+}
+.search-input::placeholder {
+  color: var(--app-text-muted);
+}
+.search-clear {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--app-text-secondary);
+}
+.chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+}
+.chip:hover {
+  border-color: rgba(90, 208, 230, 0.5);
+  color: var(--app-text);
+}
+.chip.on {
+  background: var(--app-brand-gradient);
+  border-color: transparent;
+  color: #071018;
+}
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+}
+.refresh-btn:hover:not(:disabled) {
+  border-color: rgba(90, 208, 230, 0.5);
+  color: var(--app-text);
+}
+
+.job-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+}
+.job-card:hover {
+  border-color: rgba(90, 208, 230, 0.4);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+.meta-chip {
+  color: var(--app-text);
+  background: rgba(255, 255, 255, 0.07);
+}
+.meta-chip.salary {
+  color: var(--app-amber);
+  background: rgba(242, 193, 78, 0.12);
+}
+.meta-chip.salary.off {
+  color: var(--app-text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+.skill-pill {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--app-text-secondary);
+}
+.detail-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-secondary);
+}
+.detail-btn:hover {
+  border-color: rgba(90, 208, 230, 0.5);
+  color: var(--app-text);
+}
+.interview-btn {
+  background: var(--app-brand-gradient);
+  color: #071018;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 8px 22px -8px rgba(107, 139, 255, 0.6);
+}
+.interview-btn:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset, 0 12px 30px -8px rgba(107, 139, 255, 0.7);
+}
+
+/* 详情弹窗玻璃化 */
+.modal-mask {
+  background: rgba(5, 7, 14, 0.6);
+  backdrop-filter: blur(6px);
+}
+.modal {
+  background: rgba(18, 24, 42, 0.9);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: var(--glass-shadow);
+}
+.modal-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.modal-close {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--app-text-secondary);
+}
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.info-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.jd-text {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.welfare-pill {
+  background: rgba(67, 217, 163, 0.14);
+  color: var(--app-success);
+}
+.modal-foot {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.src-badge {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--app-text-secondary);
+}
+.src-link {
+  color: var(--app-cyan);
+}
 </style>

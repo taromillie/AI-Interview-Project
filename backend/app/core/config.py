@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     DEFAULT_LLM_BASE_URL: str = "https://api.openai.com/v1"
 
     # 岗位采集
-    JOB_SOURCE_ENABLED: str = "jobui"    # 逗号分隔: jobui(职友集真实数据) / builtin(离线示例兜底，默认关闭)
+    JOB_SOURCE_ENABLED: str = "jobui"    # 逗号分隔: jobui(职友集，中国真实岗位) / builtin(离线示例兜底，默认关闭)
     JOB_SYNC_INTERVAL_HOURS: float = 0.5  # 默认自动同步间隔（小时，0.5=30分钟；可在前端动态调整）
     JOB_SYNC_ON_STARTUP: bool = True      # 启动后立即同步一次
 

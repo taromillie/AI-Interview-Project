@@ -49,7 +49,7 @@
 
 <script setup>
 import { Setting } from '@element-plus/icons-vue'
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/api/http'
 
@@ -79,7 +79,7 @@ const form = reactive({
 const active = ref(null)
 const saving = ref(false)
 
-const defaultModel = () => DEFAULT_MODELS[form.provider_name] || ''
+const defaultModel = computed(() => DEFAULT_MODELS[form.provider_name] || '')
 
 function onProviderChange(name) {
   form.base_url = name === 'custom' ? '' : KNOWN_PROVIDERS[name]
@@ -125,9 +125,15 @@ onMounted(() => {
 .active-tag {
   margin-left: 12px;
 }
-
-
 .form {
   max-width: 560px;
+  padding: 20px 22px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
 }
 </style>
+

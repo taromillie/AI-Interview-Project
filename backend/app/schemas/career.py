@@ -1,5 +1,5 @@
 """转行诊断与谈薪评估契约。"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CareerDiagnosisRequest(BaseModel):
@@ -31,6 +31,16 @@ class CareerPlanOut(BaseModel):
     transition_projects: list[dict] = Field(default_factory=list)
     summary: str = ""
     created_at: object | None = None
+
+    @field_validator("transferable", "gaps", "roadmap", "transition_projects", mode="before")
+    @classmethod
+    def _list_or_empty(cls, v):
+        return v if v is not None else []
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def _str_or_empty(cls, v):
+        return v if v is not None else ""
 
 
 class SalaryEvalRequest(BaseModel):

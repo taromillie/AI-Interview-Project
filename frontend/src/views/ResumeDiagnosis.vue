@@ -868,4 +868,48 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
 }
+
+/* ==================== 深色液态玻璃覆盖 ==================== */
+.wizard,
+.w-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--app-shadow-sm);
+}
+.w-dot { background: rgba(255, 255, 255, 0.06); border: 2px solid var(--app-border); }
+.w-step.active .w-dot {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 0 0 5px rgba(90, 208, 230, 0.16), 0 6px 16px -4px rgba(107, 139, 255, 0.5);
+}
+.w-step.done .w-dot {
+  color: #071018;
+  background: linear-gradient(135deg, #43d9a3, #2fb589);
+  box-shadow: 0 0 0 5px rgba(67, 217, 163, 0.16);
+}
+.w-step.active .w-label { color: var(--app-cyan); }
+.w-line.done { background: linear-gradient(90deg, #43d9a3, #5ad0e6); }
+.w-ico {
+  color: #071018;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 6px 14px -4px rgba(90, 208, 230, 0.5);
+}
+.w-ico.grad { background: linear-gradient(135deg, #6b8bff, #8b6bff); }
+.w-ico.green { background: linear-gradient(135deg, #43d9a3, #2fb589); }
+.score-num { color: var(--app-cyan); }
+.history-item {
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.history-item:hover {
+  border-color: rgba(90, 208, 230, 0.4);
+  background: rgba(255, 255, 255, 0.07);
+}
+.history-item.selected {
+  border-color: var(--app-cyan);
+  background: var(--app-brand-soft);
+}
+.history-title { color: var(--app-text); }
 </style>
