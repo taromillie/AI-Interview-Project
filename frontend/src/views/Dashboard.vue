@@ -186,10 +186,14 @@ onMounted(async () => {
   padding: 46px 0 34px;
 }
 .hero-title {
-  font-size: clamp(30px, 5vw, 40px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--app-text);
+  font-size: clamp(30px, 5vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #4f46e5 0%, #a855f7 55%, #ec4899 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
   line-height: 1.15;
 }
 .hero-desc {
@@ -202,12 +206,14 @@ onMounted(async () => {
 .hero-card {
   max-width: 640px;
   margin: 30px auto 0;
-  background: #ffffff;
-  border: 1px solid var(--app-border);
-  border-radius: 20px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--app-radius-lg);
   padding: 26px 28px 22px;
   text-align: left;
-  box-shadow: 0 2px 4px rgba(20, 20, 20, 0.02), 0 16px 40px -12px rgba(20, 20, 20, 0.1);
+  box-shadow: var(--app-shadow-md);
 }
 .hero-card__prompt {
   font-size: 16px;
@@ -225,15 +231,15 @@ onMounted(async () => {
   grid-template-columns: 1fr auto;
   gap: 8px;
   margin-top: 16px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 14px;
   padding: 5px;
-  background: var(--app-bg);
+  background: rgba(255, 255, 255, 0.6);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .cta-form:focus-within {
-  border-color: var(--app-text);
-  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.06);
+  border-color: var(--app-brand);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.18);
 }
 .cta-field {
   border: none;
@@ -249,21 +255,23 @@ onMounted(async () => {
 }
 .cta-btn {
   border: none;
-  background: var(--app-brand);
+  background: var(--app-brand-gradient);
   color: #fff;
-  border-radius: 9px;
-  padding: 10px 18px;
+  border-radius: 10px;
+  padding: 10px 20px;
   font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 160ms var(--ease-out);
+  box-shadow: 0 6px 18px -4px rgba(99, 102, 241, 0.5);
+  transition: box-shadow 0.2s ease, transform 160ms var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
   .cta-btn:hover {
-    background: #333333;
+    box-shadow: 0 10px 26px -4px rgba(99, 102, 241, 0.6);
+    transform: translateY(-1px);
   }
 }
 .cta-btn:active {
@@ -278,8 +286,8 @@ onMounted(async () => {
   margin-top: 14px;
 }
 .chip {
-  border: 1px solid var(--app-border);
-  background: var(--app-bg);
+  border: 1px solid var(--app-border-strong);
+  background: rgba(255, 255, 255, 0.5);
   color: var(--app-text-secondary);
   font-size: 12px;
   border-radius: 999px;
@@ -289,9 +297,9 @@ onMounted(async () => {
 }
 @media (hover: hover) and (pointer: fine) {
   .chip:hover {
-    border-color: var(--app-border-strong);
-    color: var(--app-text);
-    background: #fff;
+    border-color: var(--app-brand);
+    color: var(--app-brand);
+    background: var(--app-brand-soft);
   }
 }
 
@@ -303,8 +311,8 @@ onMounted(async () => {
   margin-top: 22px;
 }
 .quick {
-  border: 1px solid var(--app-border);
-  background: transparent;
+  border: 1px solid var(--app-border-strong);
+  background: rgba(255, 255, 255, 0.5);
   color: var(--app-text-secondary);
   font-size: 13px;
   border-radius: 999px;
@@ -317,8 +325,8 @@ onMounted(async () => {
 }
 @media (hover: hover) and (pointer: fine) {
   .quick:hover {
-    border-color: var(--app-text);
-    color: var(--app-text);
+    border-color: var(--app-brand);
+    color: var(--app-brand);
     background: var(--app-brand-soft);
   }
 }
@@ -365,18 +373,21 @@ onMounted(async () => {
   gap: 14px;
 }
 .job-card {
-  background: #fff;
-  border: 1px solid var(--app-border);
-  border-radius: 14px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--app-radius-md);
   padding: 18px;
   cursor: pointer;
+  box-shadow: var(--app-shadow-sm);
   transition: border-color 0.2s ease, transform 0.2s var(--ease-out), box-shadow 0.2s ease;
 }
 @media (hover: hover) and (pointer: fine) {
   .job-card:hover {
-    border-color: var(--app-border-strong);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(20, 20, 20, 0.04), 0 12px 32px rgba(20, 20, 20, 0.08);
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: translateY(-3px);
+    box-shadow: var(--app-shadow-md);
   }
 }
 .job-card:active {
@@ -412,8 +423,9 @@ onMounted(async () => {
 }
 .pill {
   background: var(--app-brand-soft);
-  color: var(--app-text-secondary);
+  color: var(--app-brand);
   font-size: 11px;
+  font-weight: 500;
   padding: 2px 9px;
   border-radius: 999px;
 }
@@ -424,7 +436,7 @@ onMounted(async () => {
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--app-text-secondary);
+  color: var(--app-brand);
 }
 
 /* ---------- 功能列表 ---------- */
@@ -437,18 +449,22 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: #fff;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--app-radius-md);
   padding: 14px 16px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.2s ease, transform 0.2s var(--ease-out);
+  box-shadow: var(--app-shadow-sm);
+  transition: border-color 0.2s ease, transform 0.2s var(--ease-out), box-shadow 0.2s ease;
 }
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
-    border-color: var(--app-border-strong);
-    transform: translateY(-1px);
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: translateY(-2px);
+    box-shadow: var(--app-shadow-md);
   }
 }
 .card:active {

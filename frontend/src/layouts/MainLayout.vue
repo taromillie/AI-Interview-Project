@@ -130,10 +130,11 @@ function handleLogout() {
   gap: 28px;
   height: 60px;
   padding: 0 clamp(1.5rem, 5vw, 3rem);
-  background: rgba(247, 247, 245, 0.86);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 4px 24px -12px rgba(80, 70, 180, 0.25);
 }
 
 .wordmark {
@@ -148,7 +149,7 @@ function handleLogout() {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--app-brand);
+  background: var(--app-brand-gradient);
   color: #fff;
   font-size: 15px;
   font-weight: 700;
@@ -156,6 +157,7 @@ function handleLogout() {
   align-items: center;
   justify-content: center;
   letter-spacing: 0;
+  box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.5);
 }
 .wordmark-text {
   font-size: 16px;

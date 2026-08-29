@@ -4,37 +4,44 @@
 
 <style>
 :root {
-  /* Element Plus 主题色：中性墨色（去 AI 味、去品牌化） */
-  --el-color-primary: #1a1a1a;
-  --el-color-primary-light-3: #525252;
-  --el-color-primary-light-5: #8a8a8a;
-  --el-color-primary-light-7: #c2c2c2;
-  --el-color-primary-light-8: #d9d9d9;
-  --el-color-primary-light-9: #f0f0f0;
-  --el-color-primary-dark-2: #000000;
+  /* Element Plus 主题色：靛蓝品牌色（现代感） */
+  --el-color-primary: #4f46e5;
+  --el-color-primary-light-3: #7c74ec;
+  --el-color-primary-light-5: #a5a0f2;
+  --el-color-primary-light-7: #cecbf8;
+  --el-color-primary-light-8: #e2e0fb;
+  --el-color-primary-light-9: #f0effd;
+  --el-color-primary-dark-2: #3f37cf;
 
-  --el-border-radius-base: 8px;
-  --el-border-radius-small: 6px;
+  --el-border-radius-base: 10px;
+  --el-border-radius-small: 8px;
   --el-border-radius-round: 999px;
 
-  /* 设计令牌：中性纸感 */
-  --app-bg: #f7f7f5;
-  --app-text: #1a1a1a;
-  --app-text-secondary: #666666;
-  --app-text-muted: #999999;
-  --app-border: #e6e6e6;
-  --app-border-strong: #d4d4d4;
-  --app-brand: #1a1a1a;
-  --app-brand-dark: #000000;
-  --app-brand-gradient: linear-gradient(135deg, #1a1a1a 0%, #333333 100%);
-  --app-brand-soft: #f0f0ee;
-  --app-success: #2f9e6e;
-  --app-warning: #c97f2b;
-  --app-danger: #d64545;
-  --app-shadow-sm: 0 1px 2px rgba(20, 20, 20, 0.04), 0 4px 16px rgba(20, 20, 20, 0.04);
-  --app-shadow-md: 0 4px 8px rgba(20, 20, 20, 0.05), 0 12px 32px rgba(20, 20, 20, 0.08);
-  --app-radius-lg: 16px;
-  --app-radius-md: 12px;
+  /* 设计令牌：毛玻璃现代感 */
+  --app-bg: #eef1f8;
+  --app-text: #1e1b3a;
+  --app-text-secondary: #565175;
+  --app-text-muted: #8b87a3;
+  --app-border: rgba(255, 255, 255, 0.6);
+  --app-border-strong: rgba(120, 110, 200, 0.28);
+  --app-brand: #4f46e5;
+  --app-brand-dark: #3f37cf;
+  --app-brand-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --app-brand-soft: rgba(99, 102, 241, 0.1);
+  --app-success: #10b981;
+  --app-warning: #f59e0b;
+  --app-danger: #ef4444;
+
+  /* 毛玻璃玻璃面板令牌 */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-blur: 18px;
+
+  --app-shadow-sm: 0 1px 2px rgba(80, 70, 180, 0.05), 0 8px 24px -8px rgba(80, 70, 180, 0.12);
+  --app-shadow-md: 0 4px 12px rgba(80, 70, 180, 0.08), 0 18px 44px -12px rgba(80, 70, 180, 0.2);
+  --app-radius-lg: 20px;
+  --app-radius-md: 14px;
 
   /* 自定义缓动曲线 */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -83,6 +90,12 @@ body {
 body {
   font-family: var(--app-font);
   background: var(--app-bg);
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(99, 102, 241, 0.22), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(168, 85, 247, 0.2), transparent 40%),
+    radial-gradient(circle at 78% 88%, rgba(56, 189, 248, 0.18), transparent 44%),
+    radial-gradient(circle at 20% 92%, rgba(236, 72, 153, 0.14), transparent 46%);
+  background-attachment: fixed;
   color: var(--app-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -106,12 +119,15 @@ body {
 
 /* ==================== Element Plus 细节统一 ==================== */
 
-/* 卡片：更克制的圆角与阴影 */
+/* 卡片：毛玻璃面板 */
 .el-card {
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--app-radius-md);
-  box-shadow: none;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--app-shadow-sm);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .el-card__header {
   border-bottom: 1px solid var(--app-border);
@@ -270,9 +286,11 @@ body {
   padding: 22px 26px;
   margin-bottom: 20px;
   color: var(--app-text);
-  background: #ffffff;
-  border: 1px solid var(--app-border);
-  box-shadow: none;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--app-shadow-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
