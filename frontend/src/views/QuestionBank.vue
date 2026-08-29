@@ -226,19 +226,91 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 顶部 banner 图标：品牌渐变 */
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.banner-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--app-brand-gradient);
+  box-shadow: 0 8px 20px -6px rgba(99, 102, 241, 0.55);
+  flex-shrink: 0;
+}
+.banner-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--app-text);
+}
+.banner-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--app-text-secondary);
+  max-width: 720px;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-weight: 700;
+  color: var(--app-text);
 }
 .filters {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
+  padding: 14px;
+  border-radius: var(--app-radius-md);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid var(--glass-border);
 }
 .tag {
   margin-right: 4px;
+}
+
+/* 表格：透明化，透出毛玻璃 */
+:deep(.el-table),
+:deep(.el-table__inner-wrapper),
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent;
+}
+:deep(.el-table) {
+  --el-table-border-color: rgba(120, 110, 200, 0.14);
+  --el-table-header-text-color: var(--app-text-secondary);
+  --el-table-text-color: var(--app-text);
+}
+:deep(.el-table th.el-table__cell) {
+  font-weight: 700;
+}
+:deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: rgba(99, 102, 241, 0.08) !important;
+}
+
+/* 弹窗：毛玻璃 */
+:deep(.el-dialog) {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-md);
+}
+:deep(.el-dialog__title) {
+  font-weight: 700;
+  color: var(--app-text);
 }
 </style>
