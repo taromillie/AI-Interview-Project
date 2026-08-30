@@ -244,23 +244,39 @@ def default_skills(direction: str) -> list[str]:
     return list(_DIRECTION_DEFAULT_SKILLS.get(direction, _DIRECTION_DEFAULT_SKILLS["tech"]))
 
 
-def build_description(item: JobItem, exp: str = "", edu: str = "", industry: str = "") -> str:
-    """基于真实岗位字段生成岗位摘要（详情以原文为准）。"""
+# 方向化职责模板：让不同方向的 JD 明显不同（同方向内再靠公司/行业/技能/薪资区分）
+_DIRECTION_DUTIES: dict[str, str] = {
+    "backend": "负责后端服务的架构设计与核心模块开发；保障系统的高可用、高性能与安全性；参与技术方案评审与线上问题排查。",
+    "frontend": "负责前端页面的开发与体验优化；参与组件库与前端工程化体系建设；持续提升页面性能与交互质量。",
+    "algorithm": "负责算法方案的设计、实验与上线；通过数据驱动的方式持续优化模型效果；跟踪前沿技术并落地到业务场景。",
+    "product": "负责产品规划与需求分析；输出高质量 PRD 并推动研发落地；通过数据分析驱动产品迭代与决策。",
+    "operations": "负责用户增长与内容运营策略的制定与执行；通过数据分析优化运营效果；协同多团队达成业务目标。",
+    "data": "负责数据体系的建设与业务分析；搭建核心指标看板与报表；支持业务方的取数与分析需求。",
+    "tech": "负责对应岗位的核心业务工作；参与需求分析、方案设计与落地执行；与团队协作保障交付质量。",
+}
+
+
+def build_description(
+    item: JobItem, exp: str = "", edu: str = "", industry: str = "", salary_text: str = ""
+) -> str:
+    """基于真实岗位字段生成差异化岗位摘要（详情以原文为准）。"""
     skills = "、".join(item.skills[:5]) if item.skills else "相关领域技能"
     lines = [
         f"【岗位方向】{item.direction} / {item.name}",
     ]
     if industry:
         lines.append(f"【所属行业】{industry}")
+    if salary_text:
+        lines.append(f"【薪资范围】月薪约 {salary_text}，具体以企业招聘页为准")
     if exp or edu:
         lines.append(f"【任职要求】{exp or '经验不限'} · {edu or '学历不限'}")
+    duty = _DIRECTION_DUTIES.get(item.direction, _DIRECTION_DUTIES["tech"])
     lines += [
-        f"【岗位职责】负责{item.name}相关工作，参与业务需求分析、方案设计与落地执行；"
-        f"与产品、研发、测试等团队协作，保障项目高质量交付；持续关注行业动态，优化工作流程与产出质量。",
-        f"【任职要求】熟悉{skills}，具备扎实的专业基础与学习能力；具备良好的沟通协作能力与责任心；"
+        f"【岗位职责】{duty}",
+        f"【技能要求】熟悉{skills}，具备扎实的专业基础与学习能力；具备良好的沟通协作能力与责任心；"
         f"有同岗位相关经验者优先。",
         f"【福利待遇】五险一金、带薪年假、节日福利、团队建设等，具体以企业招聘页为准。",
-        f"【说明】本职位信息来源于职友集公开搜索页，详情以招聘原文为准。",
+        f"【说明】本职位信息为基于真实公开信息的岗位摘要，详情以招聘原文为准。",
     ]
     return "\n".join(lines)
 
@@ -486,7 +502,10 @@ class JobuiSource:
         item = JobItem(
             name=job_title, direction=direction, difficulty=difficulty, skills=skills,
             company=company, city=city, salary_min=low, salary_max=high,
-            description=build_description(JobItem(name=job_title, direction=direction, difficulty=difficulty, skills=skills), exp, edu, industry),
+            description=build_description(
+                JobItem(name=job_title, direction=direction, difficulty=difficulty, skills=skills),
+                exp, edu, industry, salary_text,
+            ),
             welfare=welfare, source="jobui",
             source_id=job_path.strip("/").split("/")[-1],
             source_url=f"{self.BASE}{job_path}", published_at=published,
@@ -635,11 +654,14 @@ class _OpenApiJobSource:
         difficulty = infer_difficulty(hint)
         skills = extract_skills(hint) or default_skills(direction)
         base = JobItem(name=name, direction=direction, difficulty=difficulty, skills=skills)
+        salary_text = ""
+        if salary_min or salary_max:
+            salary_text = f"{salary_min}-{salary_max}K"
         return JobItem(
             name=name, direction=direction, difficulty=difficulty, skills=skills,
             company=company or "", city=city or "",
             salary_min=salary_min, salary_max=salary_max,
-            description=description or build_description(base),
+            description=description or build_description(base, salary_text=salary_text),
             welfare=[], source=self.name,
             source_id=str(source_id) if source_id is not None else None,
             source_url=url or "", published_at=published,
@@ -807,6 +829,10 @@ def sync_jobs(db: Session | None = None, enabled: str | None = None) -> dict:
         db = SessionLocal()
     stats = {"sources": [], "total": 0, "new": 0, "updated": 0, "errors": 0}
     try:
+        from app.services.job_quality import reprocess_jobs
+
+        # 先对存量真实岗位做一次幂等清洗（名称归一 + 技能规范化/补全）
+        stats.update(reprocess_jobs(db))
         _do_sync(db, enabled, stats)
         record_sync_done(stats)
         return stats
@@ -817,12 +843,15 @@ def sync_jobs(db: Session | None = None, enabled: str | None = None) -> dict:
 
 
 def _do_sync(db: Session, enabled: str, stats: dict) -> None:
+    from app.services.job_quality import clean_job_item
+
     for src in build_sources(enabled):
         try:
             fetched = src.fetch_jobs()
             new = updated = 0
             for item in fetched:
                 try:
+                    item = clean_job_item(item)
                     if _upsert(db, item):
                         new += 1
                     else:

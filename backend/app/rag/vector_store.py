@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.position import KnowledgeAtom
 from app.rag.embedding import EmbeddingProvider
+from app.services.position_scope import position_scope
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,12 @@ def query_top(
     query_text: str,
     top_n: int,
 ) -> list[KnowledgeAtom]:
-    """向量召回候选题目（已过滤未问过 + published），按相似度降序。"""
+    """向量召回候选题目（已过滤未问过 + published），按相似度降序。
+
+    岗位过滤不在向量层精确执行（skills 稀疏的岗位按 position_id 精确过滤会召回
+    不足），改为召回后按「直属 ∪ 技能命中」范围（services/position_scope）在
+    Python 端过滤，与关键词链路 select_candidates 语义一致。
+    """
     sync_published(db, embedder)
 
     vectors = embedder.embed([query_text or ""])
@@ -100,14 +106,19 @@ def query_top(
         return []
 
     collection = get_collection(embedder.name)
-    where: dict = {"status": "published"}
+
+    scope_ids: set[int] | None = None
     if position_id:
-        where["position_id"] = position_id
+        scope = position_scope(db, position_id)
+        if scope is None or not scope[1]:
+            # 岗位不存在或无任何候选题 → 与原 position_id 精确过滤一致：无候选
+            return []
+        scope_ids = scope[1]
 
     result = collection.query(
         query_embeddings=[vectors[0]],
-        n_results=top_n * 2,
-        where=where,
+        n_results=max(top_n * 4, 24),  # 放宽岗位过滤后放大召回，保证过滤后仍有足够候选
+        where={"status": "published"},
     )
     hit_ids = (result.get("ids") or [[]])[0] or []
     hit_ids = [i for i in hit_ids if i.startswith(ID_PREFIX)]
@@ -124,8 +135,11 @@ def query_top(
     candidates: list[KnowledgeAtom] = []
     for i in hit_ids:
         atom = atoms.get(int(i[len(ID_PREFIX):]))
-        if atom and atom.id not in asked_ids:
-            candidates.append(atom)
+        if atom is None or atom.id in asked_ids:
+            continue
+        if scope_ids is not None and atom.id not in scope_ids:
+            continue
+        candidates.append(atom)
         if len(candidates) >= top_n:
             break
     return candidates

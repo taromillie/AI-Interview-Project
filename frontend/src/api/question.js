@@ -4,6 +4,11 @@ export function listPositions() {
   return http.get('/questions/positions')
 }
 
+// 岗位方向聚合（岗位广场方向卡）：方向名 + 公司数 + 技能 + 平均薪资 + 方向岗位列表
+export function listDirections() {
+  return http.get('/questions/positions/directions')
+}
+
 export function syncPositions() {
   return http.post('/questions/positions/sync')
 }

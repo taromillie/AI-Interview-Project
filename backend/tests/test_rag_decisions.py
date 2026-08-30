@@ -5,7 +5,7 @@
 import asyncio
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.core.db import Base
@@ -208,7 +208,7 @@ def test_get_resume_evidence_from_dict():
 # ───────────────────────── 检索器：过滤与降级 ─────────────────────────
 
 def test_select_candidates_filters_draft_and_asked(db):
-    """关键词检索：过滤 draft + 已问 + 跨岗位。"""
+    """关键词检索：过滤 draft + 已问（无跨岗位题时仅剩直属 published 未问）。"""
     asked = {5}  # 已问过 id=5
     res = select_candidates(db, 1, asked, answer_text="我想问 MySQL 相关的", top_n=10)
     ids = {a.id for a in res}
@@ -251,3 +251,104 @@ def test_aselect_candidates_vector_failure_fallback(db, monkeypatch):
     )
     assert len(res) >= 1
     assert res[0].question.startswith("MySQL 索引失效")
+
+
+# ───────────────────── 岗位候选题范围（直属 ∪ 技能命中） ─────────────────────
+
+def test_select_candidates_includes_skill_hits_from_other_position(db):
+    """技能标签命中的其他岗位题可被召回，且直属题排在前面（修复检索断裂）。"""
+    other = Position(
+        id=2, name="MySQL 工程师", direction="tech", difficulty="mid",
+        skills=["MySQL"], is_public=True, status="active",
+    )
+    db.add(other)
+    db.flush()
+    db.add(KnowledgeAtom(
+        position_id=2,
+        question="MySQL 事务隔离级别有哪些？",
+        reference_points=["脏读", "不可重复读", "幻读"],
+        tags=["MySQL", "事务"],
+        difficulty="mid",
+        status="published",
+    ))
+    db.commit()
+
+    res = select_candidates(db, 1, set(), top_n=10)
+    questions = [a.question for a in res]
+    hit_idx = next(i for i, q in enumerate(questions) if "事务隔离级别" in q)
+    direct_idx = questions.index("请解释 Python GIL 对多线程的影响？")
+    assert hit_idx > direct_idx        # 直属题（GIL）排在技能命中题之前
+    assert 4 not in {a.id for a in res}  # 草稿仍被过滤
+
+
+def test_select_candidates_empty_skills_falls_back_to_direct(db):
+    """岗位 skills 为空 → 仅直属题（不因放宽范围而召回全部题库）。"""
+    other = Position(
+        id=2, name="冷门岗位", direction="tech", difficulty="mid",
+        skills=[], is_public=True, status="active",
+    )
+    db.add(other)
+    db.flush()
+    db.add(KnowledgeAtom(
+        position_id=2,
+        question="该冷门岗位专属题",
+        reference_points=["无"],
+        tags=["冷门"],
+        difficulty="mid",
+        status="published",
+    ))
+    db.commit()
+
+    res = select_candidates(db, 2, set(), top_n=10)
+    assert [a.question for a in res] == ["该冷门岗位专属题"]
+
+
+def test_query_top_filters_by_position_scope(db, monkeypatch):
+    """向量召回后按岗位范围（直属 ∪ 技能命中）过滤：草稿/无关题不进候选。"""
+    from app.rag import vector_store
+
+    other = Position(
+        id=2, name="MySQL 工程师", direction="tech", difficulty="mid",
+        skills=["MySQL"], is_public=True, status="active",
+    )
+    db.add(other)
+    db.flush()
+    other_atom = KnowledgeAtom(
+        position_id=2,
+        question="MySQL 事务隔离级别有哪些？",
+        reference_points=["脏读", "不可重复读", "幻读"],
+        tags=["MySQL", "事务"],
+        difficulty="mid",
+        status="published",
+    )
+    db.add(other_atom)
+    db.commit()
+
+    class FakeEmbedder:
+        name = "fake-model"
+
+        def embed(self, texts):
+            return [[0.1] * 4] * len(texts)
+
+    class FakeCollection:
+        def query(self, query_embeddings, n_results, where):
+            # 模拟 Chroma 返回全部 published 原子
+            ids = [
+                f"atom:{a.id}"
+                for a in db.scalars(
+                    select(KnowledgeAtom).where(KnowledgeAtom.status == "published")
+                ).all()
+            ]
+            return {"ids": [ids]}
+
+    monkeypatch.setattr(vector_store, "get_collection", lambda name: FakeCollection())
+    monkeypatch.setattr(vector_store, "sync_published", lambda db, emb: 0)
+
+    res = vector_store.query_top(
+        FakeEmbedder(), db,
+        position_id=1, asked_ids=set(), query_text="MySQL", top_n=10,
+    )
+    ids = {a.id for a in res}
+    assert 4 not in ids                       # 草稿被过滤
+    assert other_atom.id in ids               # 技能命中的其他岗位题被召回
+    assert ids <= {1, 2, 3, 5, other_atom.id}  # 全部落在岗位候选题范围内

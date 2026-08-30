@@ -1,52 +1,13 @@
 <template>
   <div class="job-market">
-    <!-- 顶部：大标题 + 搜索 -->
+    <!-- 顶部：标题 + 数据状态栏 -->
     <div class="hero">
       <div class="hero-title">岗位广场</div>
-      <div class="hero-desc">汇聚真实招聘岗位，浏览详情或一键开始模拟面试</div>
-      <div class="search-bar">
-        <el-icon class="search-ico"><Search /></el-icon>
-        <input
-          v-model="keyword"
-          class="search-input"
-          placeholder="搜索岗位、公司，如：后端、算法、字节…"
-          @keyup.enter="applyFilter"
-        />
-        <button v-if="keyword" class="search-clear" @click="keyword = ''">
-          <el-icon><Close /></el-icon>
-        </button>
-      </div>
-      <div class="filter-row">
-        <div class="chip-group">
-          <span class="chip-label">方向</span>
-          <button
-            v-for="d in directionOptions"
-            :key="d.value"
-            class="chip"
-            :class="{ on: filterDirection === d.value }"
-            @click="filterDirection = d.value"
-          >
-            {{ d.label }}
-          </button>
-        </div>
-        <div class="chip-group">
-          <span class="chip-label">难度</span>
-          <button
-            v-for="d in difficultyOptions"
-            :key="d.value"
-            class="chip"
-            :class="{ on: filterDifficulty === d.value }"
-            @click="filterDifficulty = d.value"
-          >
-            {{ d.label }}
-          </button>
-        </div>
-      </div>
-      <!-- 数据状态栏 -->
+      <div class="hero-desc">先选岗位方向，再挑心仪公司 —— 浏览真实招聘信息，一键开始模拟面试</div>
       <div class="meta-row">
         <span class="meta-item">
           <el-icon :size="13"><Clock /></el-icon>
-          共 {{ positions.length }} 个岗位 · 数据更新于 {{ updatedAgo }}
+          共 {{ directions.length }} 个方向 · {{ positions.length }} 个岗位 · 数据更新于 {{ updatedAgo }}
         </span>
         <div class="auto-sync">
           <el-select v-model="autoInterval" size="small" class="sync-select" @change="onAutoIntervalChange">
@@ -61,68 +22,146 @@
           <el-icon :size="13" :class="{ spinning: syncing }"><Refresh /></el-icon>
           {{ syncing ? '同步中…' : '立即同步' }}
         </button>
+      </div>
+    </div>
+
+    <!-- ============ 视图一：岗位方向卡 ============ -->
+    <div v-if="view === 'grid'" class="direction-grid">
+      <div v-for="d in directions" :key="d.key" class="direction-card" @click="openDirection(d)">
+        <div class="dir-head">
+          <div class="dir-name">{{ d.name }}</div>
+          <div class="dir-count">{{ d.count }} 家公司</div>
+        </div>
+        <div class="dir-salary" :class="{ off: !d.salary_min }">
+          <template v-if="d.salary_min">{{ d.salary_min }}-{{ d.salary_max }}K</template>
+          <template v-else>薪资面议</template>
+          <span class="dir-salary-label">平均薪资</span>
+        </div>
+        <div class="dir-skills">
+          <span v-for="s in (d.skills || []).slice(0, 4)" :key="s" class="skill-pill">{{ s }}</span>
+          <span v-if="(d.skills || []).length > 4" class="skill-more">+{{ (d.skills || []).length - 4 }}</span>
+        </div>
+        <div class="dir-foot">
+          <button class="dir-btn" @click.stop="startDirectionInterview(d)">
+            <el-icon :size="14"><MagicStick /></el-icon>
+            面试该方向
+          </button>
+          <button class="dir-btn ghost" @click.stop="openDirection(d)">
+            查看岗位
+            <el-icon :size="13"><ArrowRight /></el-icon>
+          </button>
+        </div>
+      </div>
+      <el-empty v-if="!loading && !directions.length" description="暂无岗位数据，点击右上角「立即同步」拉取最新招聘信息" :image-size="90" />
+    </div>
+
+    <!-- ============ 视图二：方向详情（岗位列表） ============ -->
+    <div v-else-if="view === 'detail' && currentDirection" class="detail-view">
+      <div class="detail-head">
+        <button class="back-btn" @click="backToGrid">
+          <el-icon :size="14"><ArrowLeft /></el-icon>
+          全部方向
+        </button>
+        <div class="detail-title-wrap">
+          <div class="detail-title">{{ currentDirection.name }}</div>
+          <div class="detail-sub">
+            {{ currentDirection.count }} 家公司
+            <template v-if="currentDirection.salary_min">
+              <span class="dot">·</span>
+              平均 {{ currentDirection.salary_min }}-{{ currentDirection.salary_max }}K
+            </template>
+            <span class="dot">·</span>
+            {{ filtered.length }} 个岗位
+          </div>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <el-icon class="search-ico"><Search /></el-icon>
+        <input
+          v-model="keyword"
+          class="search-input"
+          :placeholder="'在 ' + currentDirection.name + ' 中搜索岗位、公司、技能…'"
+          @keyup.enter="applyFilter"
+        />
+        <button v-if="keyword" class="search-clear" @click="keyword = ''">
+          <el-icon><Close /></el-icon>
+        </button>
+      </div>
+      <div class="filter-row">
+        <div class="chip-group">
+          <span class="chip-label">难度</span>
+          <button
+            v-for="d in difficultyOptions"
+            :key="d.value"
+            class="chip"
+            :class="{ on: filterDifficulty === d.value }"
+            @click="filterDifficulty = d.value"
+          >
+            {{ d.label }}
+          </button>
+        </div>
         <button class="refresh-btn" :class="{ on: onlyFavorite }" @click="onlyFavorite = !onlyFavorite">
           <el-icon :size="13"><StarFilled v-if="onlyFavorite" /><Star v-else /></el-icon>
           {{ onlyFavorite ? '仅看已收藏' : '全部岗位' }}
         </button>
       </div>
-    </div>
 
-    <!-- 岗位卡片网格 -->
-    <div v-if="filtered.length" class="job-grid">
-      <div v-for="j in filtered" :key="j.id" class="job-card" @click="openDetail(j)">
-        <div class="job-head">
-          <div class="job-name-row">
-            <div class="job-name">{{ j.company || '未标注公司' }}</div>
-            <button
-              class="fav-btn"
-              :class="{ on: isFav(j.id) }"
-              @click.stop="toggleFavorite(j)"
-              :title="isFav(j.id) ? '取消收藏' : '收藏岗位'"
-            >
-              <el-icon :size="15"><StarFilled v-if="isFav(j.id)" /><Star v-else /></el-icon>
+      <!-- 岗位卡片网格 -->
+      <div v-if="filtered.length" class="job-grid">
+        <div v-for="j in filtered" :key="j.id" class="job-card" @click="openDetail(j)">
+          <div class="job-head">
+            <div class="job-name-row">
+              <div class="job-name">{{ j.company || '未标注公司' }}</div>
+              <button
+                class="fav-btn"
+                :class="{ on: isFav(j.id) }"
+                @click.stop="toggleFavorite(j)"
+                :title="isFav(j.id) ? '取消收藏' : '收藏岗位'"
+              >
+                <el-icon :size="15"><StarFilled v-if="isFav(j.id)" /><Star v-else /></el-icon>
+              </button>
+            </div>
+            <div class="job-tags">
+              <el-tag v-if="appStatus(j.id)" size="small" :type="APPLICATION_STATUS[appStatus(j.id)].type" effect="dark">
+                {{ APPLICATION_STATUS[appStatus(j.id)].label }}
+              </el-tag>
+              <el-tag size="small" :type="difficultyType(j.difficulty)" effect="light">
+                {{ difficultyText(j.difficulty) }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="job-position">{{ j.name }}</div>
+          <div class="job-meta">
+            <span v-if="j.city" class="meta-chip"><el-icon :size="12"><Location /></el-icon>{{ j.city }}</span>
+            <span class="meta-chip salary" :class="{ off: !salaryText(j) }">
+              <el-icon :size="12"><Wallet /></el-icon>{{ salaryText(j) || '薪资面议' }}
+            </span>
+          </div>
+          <div class="job-skills">
+            <span v-for="s in (j.skills || []).slice(0, 5)" :key="s" class="skill-pill">{{ s }}</span>
+            <span v-if="(j.skills || []).length > 5" class="skill-more">+{{ (j.skills || []).length - 5 }}</span>
+          </div>
+          <div class="job-foot">
+            <button class="detail-btn" @click.stop="openDetail(j)">
+              查看详情
+              <el-icon :size="13"><ArrowRight /></el-icon>
+            </button>
+            <button class="interview-btn" @click.stop="startInterview(j)">
+              <el-icon :size="15"><MagicStick /></el-icon>
+              开始面试
             </button>
           </div>
-          <div class="job-tags">
-            <el-tag v-if="appStatus(j.id)" size="small" :type="APPLICATION_STATUS[appStatus(j.id)].type" effect="dark">
-              {{ APPLICATION_STATUS[appStatus(j.id)].label }}
-            </el-tag>
-            <el-tag size="small" effect="plain">{{ directionText(j.direction) }}</el-tag>
-            <el-tag size="small" :type="difficultyType(j.difficulty)" effect="light">
-              {{ difficultyText(j.difficulty) }}
-            </el-tag>
-          </div>
-        </div>
-        <div class="job-position">{{ j.name }}</div>
-        <div class="job-meta">
-          <span v-if="j.city" class="meta-chip"><el-icon :size="12"><Location /></el-icon>{{ j.city }}</span>
-          <span class="meta-chip salary" :class="{ off: !salaryText(j) }">
-            <el-icon :size="12"><Wallet /></el-icon>{{ salaryText(j) || '薪资面议' }}
-          </span>
-        </div>
-        <div class="job-skills">
-          <span v-for="s in (j.skills || []).slice(0, 5)" :key="s" class="skill-pill">{{ s }}</span>
-          <span v-if="(j.skills || []).length > 5" class="skill-more">+{{ (j.skills || []).length - 5 }}</span>
-        </div>
-        <div class="job-foot">
-          <button class="detail-btn" @click.stop="openDetail(j)">
-            查看详情
-            <el-icon :size="13"><ArrowRight /></el-icon>
-          </button>
-          <button class="interview-btn" @click.stop="startInterview(j)">
-            <el-icon :size="15"><MagicStick /></el-icon>
-            开始面试
-          </button>
         </div>
       </div>
-    </div>
 
-    <el-empty
-      v-else-if="!loading"
-      description="没有匹配的岗位，换个关键词或筛选条件试试"
-      :image-size="90"
-    />
-    <div v-if="loading" class="loading">加载中…</div>
+      <el-empty
+        v-else-if="!loading"
+        description="该方向下没有匹配的岗位，换个关键词或筛选条件试试"
+        :image-size="90"
+      />
+      <div v-if="loading" class="loading">加载中…</div>
+    </div>
 
     <!-- 岗位详情弹窗 -->
     <Transition name="fade">
@@ -246,16 +285,17 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowDown, Check, Clock, Close, Link, Location, MagicStick, Refresh, Search, Star, StarFilled, Wallet } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowRight, Check, Clock, Close, Link, Location, MagicStick, Refresh, Search, Star, StarFilled, Wallet } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getJobTrackSummary, favoritePosition, unfavoritePosition, setApplication, removeApplication, APPLICATION_STATUS } from '@/api/jobTrack'
-import { listPositions, syncPositions, getSyncConfig, updateSyncConfig } from '@/api/question'
+import { listDirections, syncPositions, getSyncConfig, updateSyncConfig } from '@/api/question'
 import { formatDate, parseDate } from '@/utils/time'
 
 const router = useRouter()
-const positions = ref([])
+const directions = ref([])
+const view = ref('grid') // grid=方向卡 | detail=方向详情
+const currentDirection = ref(null)
 const keyword = ref('')
-const filterDirection = ref('')
 const filterDifficulty = ref('')
 const loading = ref(true)
 const syncing = ref(false)
@@ -269,15 +309,6 @@ const favoriteIds = ref(new Set())
 const applicationMap = ref({})
 const onlyFavorite = ref(false)
 
-const directionOptions = [
-  { value: '', label: '全部' },
-  { value: 'backend', label: '后端' },
-  { value: 'frontend', label: '前端' },
-  { value: 'algorithm', label: '算法' },
-  { value: 'product', label: '产品' },
-  { value: 'operations', label: '运营' },
-  { value: 'data', label: '数据' },
-]
 const difficultyOptions = [
   { value: '', label: '全部' },
   { value: 'junior', label: '初级' },
@@ -285,10 +316,17 @@ const difficultyOptions = [
   { value: 'senior', label: '高级' },
 ]
 
+// 全部岗位（跨方向展平，用于全局统计）
+const positions = computed(() => directions.value.flatMap((d) => d.positions || []))
+
+// 当前视图下的岗位集合
+const currentJobs = computed(() =>
+  view.value === 'detail' ? currentDirection.value?.positions || [] : positions.value
+)
+
 const filtered = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
-  return positions.value.filter((j) => {
-    if (filterDirection.value && j.direction !== filterDirection.value) return false
+  return currentJobs.value.filter((j) => {
     if (filterDifficulty.value && j.difficulty !== filterDifficulty.value) return false
     if (onlyFavorite.value && !favoriteIds.value.has(j.id)) return false
     if (kw) {
@@ -339,6 +377,22 @@ function fmtDate(v) {
 }
 
 function applyFilter() {}
+
+// ── 视图切换 ──
+function openDirection(d) {
+  currentDirection.value = d
+  keyword.value = ''
+  filterDifficulty.value = ''
+  onlyFavorite.value = false
+  view.value = 'detail'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function backToGrid() {
+  view.value = 'grid'
+  currentDirection.value = null
+  keyword.value = ''
+}
 
 // ── 收藏与投递跟踪 ──
 const isFav = (id) => favoriteIds.value.has(id)
@@ -429,16 +483,20 @@ async function onAutoIntervalChange() {
   }
 }
 
-// ── 列表轮询：自动拉取最新岗位数据 ──
+// ── 数据加载与轮询 ──
+async function loadData() {
+  try {
+    directions.value = await listDirections()
+  } catch {
+    /* 忽略 */
+  }
+}
+
 function startPolling() {
   if (pollTimer) return
   pollTimer = setInterval(async () => {
     try {
-      const [list, cfg] = await Promise.all([listPositions(), getSyncConfig()])
-      positions.value = list
-      if (cfg.auto_enabled) {
-        nextSyncText.value = fmtNextSync(cfg.next_sync_at)
-      }
+      await Promise.all([loadData(), loadSyncConfig()])
     } catch {
       /* 静默失败，下轮重试 */
     }
@@ -454,12 +512,21 @@ function startInterview(j) {
   router.push({ name: 'interview', query: { position_id: j.id } })
 }
 
+// 方向层「面试该方向」：以该方向代表岗位进入面试
+function startDirectionInterview(d) {
+  if (!d.first_position_id) {
+    ElMessage.warning('该方向暂无岗位，无法开始面试')
+    return
+  }
+  router.push({ name: 'interview', query: { position_id: d.first_position_id } })
+}
+
 async function handleSync() {
   if (syncing.value) return
   syncing.value = true
   try {
     const res = await syncPositions()
-    positions.value = await listPositions()
+    await loadData()
     if (res && res.ok === false) {
       ElMessage.warning(res.reason || '已有同步任务进行中')
     } else {
@@ -475,7 +542,7 @@ async function handleSync() {
 
 onMounted(async () => {
   try {
-    positions.value = await listPositions()
+    await loadData()
   } catch {
     /* 忽略 */
   } finally {
@@ -496,7 +563,7 @@ onUnmounted(() => {
 
 <style scoped>
 .job-market {
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -515,91 +582,6 @@ onUnmounted(() => {
   margin-top: 8px;
   color: var(--app-text-secondary);
   font-size: 14px;
-}
-.search-bar {
-  position: relative;
-  max-width: 560px;
-  margin: 22px auto 0;
-  background: #fff;
-  border: 1.5px solid var(--app-border);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  height: 52px;
-  transition: border-color 0.2s, box-shadow 0.25s;
-  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
-}
-.search-bar:focus-within {
-  border-color: #1a1a1a;
-  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.08), var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
-}
-.search-ico {
-  color: var(--app-text-muted);
-  font-size: 18px;
-  margin-right: 10px;
-  flex-shrink: 0;
-}
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 15px;
-  color: var(--app-text);
-  background: transparent;
-}
-.search-input::placeholder {
-  color: #b3b3b3;
-}
-.search-clear {
-  border: none;
-  background: #f4f4f2;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--app-text-secondary);
-  cursor: pointer;
-}
-.filter-row {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-.chip-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.chip-label {
-  font-size: 12px;
-  color: var(--app-text-muted);
-  margin-right: 2px;
-}
-.chip {
-  border: none;
-  background: #fff;
-  color: var(--app-text-secondary);
-  font-size: 13px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  border: 1px solid var(--app-border);
-  transition: all 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
-}
-.chip:hover {
-  border-color: #1a1a1a;
-  color: #1a1a1a;
-}
-.chip.on {
-  background: #1a1a1a;
-  border-color: #1a1a1a;
-  color: #fff;
-  font-weight: 600;
 }
 .meta-row {
   display: flex;
@@ -661,6 +643,257 @@ onUnmounted(() => {
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── 视图一：方向卡网格 ── */
+.direction-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+.direction-card {
+  background: #fff;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg, 18px);
+  padding: 22px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.24s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    box-shadow 0.28s ease, border-color 0.28s ease;
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
+}
+.direction-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(26, 26, 26, 0.25);
+  box-shadow: var(--app-shadow-md, 0 10px 24px rgba(20, 20, 20, 0.08));
+}
+.dir-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.dir-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--app-text);
+  letter-spacing: 0.3px;
+}
+.dir-count {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  flex-shrink: 0;
+}
+.dir-salary {
+  font-size: 26px;
+  font-weight: 800;
+  color: #ea580c;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dir-salary.off {
+  color: var(--app-text-muted);
+  font-size: 18px;
+}
+.dir-salary-label {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--app-text-muted);
+}
+.dir-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+.skill-pill {
+  background: #f4f4f2;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.skill-more {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  align-self: center;
+}
+.dir-foot {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+}
+.dir-btn {
+  flex: 1;
+  height: 42px;
+  border: none;
+  border-radius: 12px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)), box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.25);
+}
+.dir-btn:hover {
+  box-shadow: 0 6px 18px rgba(26, 26, 26, 0.25);
+}
+.dir-btn:active {
+  transform: scale(0.97);
+}
+.dir-btn.ghost {
+  flex: 1.1;
+  background: #fff;
+  border: 1px solid var(--app-border);
+  color: var(--app-text-secondary);
+  font-weight: 500;
+  box-shadow: none;
+}
+.dir-btn.ghost:hover {
+  border-color: #1a1a1a;
+  color: #1a1a1a;
+}
+
+/* ── 视图二：方向详情 ── */
+.detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--app-border);
+  background: #fff;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.back-btn:hover {
+  border-color: #1a1a1a;
+  color: #1a1a1a;
+}
+.detail-title-wrap {
+  min-width: 0;
+}
+.detail-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--app-text);
+}
+.detail-sub {
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--app-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dot {
+  color: var(--app-border-strong);
+}
+.search-bar {
+  position: relative;
+  max-width: 560px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1.5px solid var(--app-border);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 50px;
+  transition: border-color 0.2s, box-shadow 0.25s;
+  box-shadow: var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
+}
+.search-bar:focus-within {
+  border-color: #1a1a1a;
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.08), var(--app-shadow-sm, 0 1px 3px rgba(20, 20, 20, 0.04));
+}
+.search-ico {
+  color: var(--app-text-muted);
+  font-size: 18px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  color: var(--app-text);
+  background: transparent;
+}
+.search-input::placeholder {
+  color: #b3b3b3;
+}
+.search-clear {
+  border: none;
+  background: #f4f4f2;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-text-secondary);
+  cursor: pointer;
+}
+.filter-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 14px 0 20px;
+}
+.chip-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip-label {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  margin-right: 2px;
+}
+.chip {
+  border: none;
+  background: #fff;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid var(--app-border);
+  transition: all 0.18s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.chip:hover {
+  border-color: #1a1a1a;
+  color: #1a1a1a;
+}
+.chip.on {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #fff;
+  font-weight: 600;
 }
 
 /* ── 岗位卡片网格 ── */
@@ -774,18 +1007,6 @@ onUnmounted(() => {
   gap: 6px;
   min-height: 22px;
 }
-.skill-pill {
-  background: #f4f4f2;
-  color: var(--app-text-secondary);
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 999px;
-}
-.skill-more {
-  font-size: 12px;
-  color: var(--app-text-muted);
-  align-self: center;
-}
 .job-foot {
   margin-top: auto;
   display: flex;
@@ -883,9 +1104,6 @@ onUnmounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-}
-.dot {
-  color: var(--app-border-strong);
 }
 .modal-close {
   border: none;
@@ -1127,6 +1345,51 @@ onUnmounted(() => {
   border: 1px solid var(--app-border);
 }
 .refresh-btn:hover:not(:disabled) {
+  border-color: rgba(90, 208, 230, 0.5);
+  color: var(--app-text);
+}
+
+.direction-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+}
+.direction-card:hover {
+  border-color: rgba(90, 208, 230, 0.4);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+.dir-salary {
+  color: var(--app-amber);
+}
+.dir-salary.off {
+  color: var(--app-text-muted);
+}
+.dir-btn {
+  background: var(--app-brand-gradient);
+  color: #071018;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset, 0 8px 22px -8px rgba(107, 139, 255, 0.6);
+}
+.dir-btn:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset, 0 12px 30px -8px rgba(107, 139, 255, 0.7);
+}
+.dir-btn.ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-secondary);
+  box-shadow: none;
+}
+.dir-btn.ghost:hover {
+  border-color: rgba(90, 208, 230, 0.5);
+  color: var(--app-text);
+}
+.back-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--app-border);
+}
+.back-btn:hover {
   border-color: rgba(90, 208, 230, 0.5);
   color: var(--app-text);
 }

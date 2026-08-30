@@ -10,6 +10,7 @@ from app.api.deps import get_current_user, require_admin
 from app.core.db import get_db
 from app.models.position import KnowledgeAtom, Position
 from app.models.user import User
+from app.services.skill_catalog import SKILL_SYNONYMS as TAG_SYNONYMS
 
 router = APIRouter(prefix="/questions", tags=["题库管理"])
 
@@ -556,92 +557,6 @@ BUILTIN_ATOMS = {
 }
 
 
-# 技能同义词表：key 为 _norm() 规范化后的别名，value 为规范标签。
-# 用于复盘薄弱知识点（LLM 输出五花八门）与题库标签之间的宽松匹配。
-TAG_SYNONYMS = {
-    "java": "Java",
-    "jvm": "JVM",
-    "spring": "Spring Boot",
-    "springboot": "Spring Boot",
-    "springmvc": "Spring MVC",
-    "springcloud": "Spring Cloud",
-    "mybatis": "MyBatis",
-    "mysql": "MySQL",
-    "sql": "SQL",
-    "postgres": "PostgreSQL",
-    "postgresql": "PostgreSQL",
-    "redis": "Redis",
-    "mongo": "MongoDB",
-    "mongodb": "MongoDB",
-    "kafka": "Kafka",
-    "mq": "消息队列",
-    "消息队列": "消息队列",
-    "rabbitmq": "RabbitMQ",
-    "python": "Python",
-    "fastapi": "FastAPI",
-    "django": "Django",
-    "flask": "Flask",
-    "golang": "Go",
-    "go语言": "Go",
-    "react": "React",
-    "reactjs": "React",
-    "vue": "Vue",
-    "vuejs": "Vue",
-    "vue2": "Vue",
-    "vue3": "Vue",
-    "angular": "Angular",
-    "node": "Node.js",
-    "nodejs": "Node.js",
-    "typescript": "TypeScript",
-    "ts": "TypeScript",
-    "javascript": "JavaScript",
-    "js": "JavaScript",
-    "html": "HTML/CSS",
-    "css": "HTML/CSS",
-    "docker": "Docker",
-    "k8s": "Kubernetes",
-    "kubernetes": "Kubernetes",
-    "linux": "Linux",
-    "git": "Git",
-    "pytorch": "PyTorch",
-    "tensorflow": "TensorFlow",
-    "spark": "Spark",
-    "flink": "Flink",
-    "hive": "Hive",
-    "hadoop": "Hadoop",
-    "etl": "ETL",
-    "elasticsearch": "Elasticsearch",
-    "es": "Elasticsearch",
-    "nginx": "Nginx",
-    "grpc": "gRPC",
-    "jwt": "JWT",
-    "http": "HTTP",
-    "tcp": "TCP",
-    "websocket": "WebSocket",
-    "设计模式": "设计模式",
-    "高并发": "高并发",
-    "并发": "高并发",
-    "分布式": "分布式",
-    "微服务": "微服务",
-    "缓存": "缓存",
-    "数据库": "数据库",
-    "索引": "索引",
-    "性能优化": "性能优化",
-    "网络安全": "网络安全",
-    "操作系统": "操作系统",
-    "计算机网络": "计算机网络",
-    "数据结构": "数据结构",
-    "算法": "算法",
-    "机器学习": "机器学习",
-    "深度学习": "深度学习",
-    "推荐系统": "推荐系统",
-    "prompt": "Prompt 设计",
-    "rag": "RAG",
-    "大模型": "大模型应用",
-    "llm": "大模型应用",
-}
-
-
 def _norm(s: str) -> str:
     """规范化：小写并去掉全部空白，用于同义词/子串匹配。"""
     return "".join(str(s).lower().split())
@@ -791,6 +706,24 @@ def list_positions(user: User = Depends(get_current_user), db: Session = Depends
     """岗位列表：内置岗位库为空时自动初始化。"""
     _seed_builtin_positions(db)
     return db.scalars(select(Position).where(Position.status == "active").order_by(Position.id)).all()
+
+
+@router.get("/positions/directions")
+def list_position_directions(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """岗位方向聚合（岗位广场两级视图的方向卡）。
+
+    把岗位列表按「归一岗位名」聚合成方向卡：方向名 + 公司数 + Top 技能 +
+    平均薪资 + 该方向岗位列表。归一逻辑见 services/position_directions。
+    """
+    from app.services.position_directions import build_directions
+
+    _seed_builtin_positions(db)
+    positions = db.scalars(
+        select(Position).where(Position.status == "active").order_by(Position.id)
+    ).all()
+    return build_directions(positions)
 
 
 class ImportRequest(BaseModel):

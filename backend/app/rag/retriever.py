@@ -7,7 +7,9 @@
 
 关键词检索规则：
 - 排除已问过的题目；
-- 按"题目/标签中的技能词是否命中最新回答"加权排序，优先追问相关内容；
+- 候选范围 = 直属题 ∪ 岗位技能标签命中的题（见 services/position_scope），
+  修复"检索断裂"：skills 稀疏的真实岗位也能召回足够题目，不同岗位方向考不同方向的题；
+- 直属题优先，组内按"题目/标签中的技能词是否命中最新回答"加权排序，优先追问相关内容；
 - 未命中时按难度从易到难兜底，保证永远有候选。
 """
 import asyncio
@@ -19,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.models.position import KnowledgeAtom
 from app.rag.embedding import EmbeddingProvider
 from app.rag.vector_store import query_top as _vector_query_top
+from app.services.position_scope import position_scope
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +50,26 @@ def select_candidates(
     answer_text: str | None = None,
     top_n: int = 6,
 ) -> list[KnowledgeAtom]:
-    """关键词检索：返回推荐的候选题目列表（已过滤未问过 + published）。"""
+    """关键词检索：返回推荐的候选题目列表（已过滤未问过 + published）。
+
+    候选范围（修复"检索断裂"）：
+    - position_id 为空 → 全部 published 原子；
+    - 指定岗位 → 「直属题 ∪ 岗位技能标签命中的题」，与题库管理页筛选一致，
+      使 skills 稀疏的真实岗位也能召回足够题目，不同岗位方向考不同方向的题。
+    排序：直属题优先，组内按命中分 + 难度（先易后难）。
+    """
     stmt = select(KnowledgeAtom).where(KnowledgeAtom.status == "published")
+    direct_ids: set[int] | None = None
     if position_id:
-        stmt = stmt.where(KnowledgeAtom.position_id == position_id)
+        scope = position_scope(db, position_id)
+        if scope is None:
+            # 岗位不存在 → 退化为原「直属过滤」语义，保证行为一致
+            stmt = stmt.where(KnowledgeAtom.position_id == position_id)
+        elif not scope[1]:
+            return []
+        else:
+            direct_ids, scope_ids = scope
+            stmt = stmt.where(KnowledgeAtom.id.in_(scope_ids))
     atoms = db.scalars(stmt).all()
 
     unasked = [a for a in atoms if a.id not in asked_ids]
@@ -59,7 +78,11 @@ def select_candidates(
 
     scored = sorted(
         unasked,
-        key=lambda a: (_hit_score(a, answer_text), _diff_weight(a.difficulty)),
+        key=lambda a: (
+            a.id in (direct_ids or set()),  # 直属题优先（无岗位过滤时恒 False，排序退化）
+            _hit_score(a, answer_text),
+            _diff_weight(a.difficulty),
+        ),
         reverse=True,
     )
     return scored[:top_n]
