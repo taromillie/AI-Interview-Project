@@ -5,7 +5,7 @@ LLM 基于多个 offer 的年化总包与综合因素给出对比分析；失败
 import json
 import logging
 
-from app.agents.prompts import OFFER_COMPARE_PROMPT
+from app.agents.prompts import OFFER_COMPARE_PROMPT, OFFER_COMPARE_STREAM_PROMPT
 from app.llm.base import ChatMessage, LLMProvider
 from app.models.offer import Offer
 
@@ -66,16 +66,20 @@ def build_compare_table(offers: list[Offer]) -> list[dict]:
     return [{"field": f, "values": vs} for f, vs in fields]
 
 
-async def compare_offers(llm: LLMProvider, offers: list[Offer]) -> tuple[list[dict], str]:
-    """返回（对比表, AI 分析建议）。"""
-    table = build_compare_table(offers)
-    offers_text = "\n".join(
+def _offers_text(offers: list[Offer]) -> str:
+    """把 Offer 列表压缩成给 LLM 的单段文本。"""
+    return "\n".join(
         f"{i+1}. {o.company}｜{o.position or '-'}｜{o.city or '-'}｜月薪{o.monthly_salary}元×{12 + o.bonus_months}薪｜"
         f"股票年化{o.stock_value}元/年｜年化总包{annual_package(o)}元｜生活平衡{o.work_balance}/10｜"
         f"福利：{o.benefits or '-'}｜备注：{o.notes or '-'}"
         for i, o in enumerate(offers)
     )
-    prompt = OFFER_COMPARE_PROMPT.format(offers_text=offers_text)
+
+
+async def compare_offers(llm: LLMProvider, offers: list[Offer]) -> tuple[list[dict], str]:
+    """返回（对比表, AI 分析建议）。供测试与规则兜底复用。"""
+    table = build_compare_table(offers)
+    prompt = OFFER_COMPARE_PROMPT.format(offers_text=_offers_text(offers))
     try:
         raw = await llm.achat([ChatMessage("user", prompt)], temperature=0.3, max_tokens=800)
         data = _extract_json(raw)
@@ -86,3 +90,17 @@ async def compare_offers(llm: LLMProvider, offers: list[Offer]) -> tuple[list[di
         logger.warning("offer compare LLM 失败，使用规则兜底", exc_info=True)
         analysis = _rule_analysis(offers)
     return table, analysis
+
+
+async def stream_compare_analysis(llm: LLMProvider, offers: list[Offer]):
+    """流式产出 AI 分析文本；异常时产出规则兜底文本。"""
+    prompt = OFFER_COMPARE_STREAM_PROMPT.format(offers_text=_offers_text(offers))
+    try:
+        async for chunk in llm.stream(
+            [ChatMessage("user", prompt)], temperature=0.3, max_tokens=800
+        ):
+            if chunk:
+                yield chunk
+    except Exception:
+        logger.warning("offer compare LLM 流式失败，使用规则兜底", exc_info=True)
+        yield _rule_analysis(offers)

@@ -482,6 +482,50 @@ html .el-progress-bar__outer {
   color: var(--app-text-secondary);
 }
 
+/* 单选/复选 框体（深色玻璃化，避免默认全黑/刺眼白）
+   关键变量定义在 .el-checkbox / .el-radio 类上，需以更高特异性在同类上覆盖才能生效 */
+html .el-checkbox {
+  --el-checkbox-bg-color: rgba(90, 208, 230, 0.08);
+  --el-checkbox-input-border: 1px solid rgba(90, 208, 230, 0.55);
+  --el-checkbox-input-border-color-hover: #5ad0e6;
+  --el-checkbox-checked-bg-color: #5ad0e6;
+  --el-checkbox-checked-input-border-color: #5ad0e6;
+  --el-checkbox-checked-icon-color: #071018;
+  --el-checkbox-checked-text-color: #5ad0e6;
+  --el-checkbox-disabled-input-fill: rgba(255, 255, 255, 0.05);
+  --el-checkbox-disabled-checked-input-fill: rgba(255, 255, 255, 0.2);
+  --el-checkbox-disabled-checked-input-border-color: rgba(255, 255, 255, 0.2);
+}
+html .el-checkbox__inner {
+  background-color: rgba(90, 208, 230, 0.08) !important;
+  border-color: rgba(90, 208, 230, 0.55) !important;
+}
+html .el-checkbox__inner:hover {
+  background-color: rgba(90, 208, 230, 0.16) !important;
+  border-color: #5ad0e6 !important;
+}
+html .el-checkbox__input.is-checked .el-checkbox__inner,
+html .el-checkbox__input.is-indeterminate .el-checkbox__inner,
+html .el-checkbox__input.is-checked .el-checkbox__inner:hover,
+html .el-checkbox__input.is-indeterminate .el-checkbox__inner:hover {
+  background-color: #5ad0e6 !important;
+  background-image: linear-gradient(135deg, #5ad0e6, #6b8bff) !important;
+  border-color: transparent !important;
+}
+html .el-checkbox__input.is-checked .el-checkbox__inner:after {
+  border-color: #071018 !important;
+}
+html .el-checkbox__input.is-indeterminate .el-checkbox__inner:before {
+  background-color: #071018 !important;
+}
+html .el-radio {
+  --el-radio-input-border-color: rgba(90, 208, 230, 0.55);
+  --el-radio-input-border-color-hover: #5ad0e6;
+  --el-radio-checked-border-color: #5ad0e6;
+  --el-radio-checked-background-color: #5ad0e6;
+  --el-radio-checked-icon-color: #071018;
+}
+
 /* 描述列表 */
 html .el-descriptions {
   --el-descriptions-item-bordered-label-background: rgba(255, 255, 255, 0.05);

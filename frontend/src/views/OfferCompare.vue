@@ -26,6 +26,10 @@
               <div class="w-title">录入你的 Offer</div>
               <div class="w-desc">至少添加 2 个 Offer 才能开始对比</div>
             </div>
+            <button class="history-btn" @click="openHistory">
+              <el-icon :size="15"><Clock /></el-icon>
+              历史记录
+            </button>
           </div>
 
           <el-form label-position="top">
@@ -90,9 +94,22 @@
           </el-form>
 
           <template v-if="offers.length">
-            <el-divider content-position="left">已添加（{{ offers.length }} 个）</el-divider>
+            <el-divider content-position="left">
+              已添加（{{ offers.length }} 个）
+              <el-checkbox
+                class="select-all"
+                :model-value="selectedIds.length === offers.length"
+                :indeterminate="selectedIds.length > 0 && selectedIds.length < offers.length"
+                @change="toggleSelectAll"
+              >全选</el-checkbox>
+            </el-divider>
             <div class="offer-list">
               <div v-for="o in offers" :key="o.id" class="offer-item">
+                <el-checkbox
+                  :model-value="selectedIds.includes(o.id)"
+                  class="offer-check"
+                  @change="(v) => toggleSelect(o.id, v)"
+                />
                 <div class="offer-main">
                   <div class="offer-title">
                     {{ o.company }}
@@ -127,35 +144,15 @@
             </div>
           </div>
 
-          <template v-if="compare.table.length">
-            <el-table :data="compare.table" border size="small" class="cmp-table">
-              <el-table-column prop="field" label="维度" width="130" />
-              <el-table-column
-                v-for="(_, i) in compare.table[0]?.values || []"
-                :key="i"
-                :label="offers[i]?.company || `Offer ${i + 1}`"
-              >
-                <template #default="{ row }">
-                  <span
-                    :class="{
-                      best: isBest(row.field, i),
-                      total: row.field.includes('年化总包'),
-                    }"
-                  >
-                    {{ row.values[i] }}
-                  </span>
-                </template>
-              </el-table-column>
-            </el-table>
-            <div class="best-hint">绿色高亮 = 该维度最优</div>
-
-            <div class="section-title">AI 综合建议</div>
-            <div class="analysis-box">{{ compare.analysis }}</div>
-          </template>
+          <CompareResult
+            v-if="compare.table.length"
+            :table="compare.table"
+            :analysis="compare.analysis"
+          />
 
           <el-empty
             v-else
-            description="录入至少 2 个 Offer 后点击「开始对比」"
+            description="录入至少 2 个 Offer 后勾选并点击「开始对比」"
             :image-size="80"
           />
         </section>
@@ -170,15 +167,20 @@
       </el-button>
       <div class="w-nav-spacer"></div>
       <template v-if="currentStep === 1">
-        <div class="nav-hint">{{ offers.length < 2 ? `还需 ${2 - offers.length} 个 Offer` : `已添加 ${offers.length} 个，可以对比了` }}</div>
+        <div class="nav-hint">
+          <template v-if="selectedIds.length < 2">
+            请至少勾选 2 个 Offer（已选 {{ selectedIds.length }} / {{ offers.length }}）
+          </template>
+          <template v-else>已选 {{ selectedIds.length }} 个，可以对比了</template>
+        </div>
         <el-button
           type="primary"
           size="large"
           :loading="comparing"
-          :disabled="offers.length < 2"
+          :disabled="selectedIds.length < 2"
           @click="goNext"
         >
-          {{ comparing ? '正在对比…' : '开始对比' }}
+          {{ comparing ? '正在对比…' : `对比所选 ${selectedIds.length} 个` }}
           <el-icon v-if="!comparing" class="el-icon--right"><MagicStick /></el-icon>
         </el-button>
       </template>
@@ -189,6 +191,28 @@
         </el-button>
       </template>
     </div>
+
+    <!-- 对比历史记录抽屉 -->
+    <el-drawer v-model="historyOpen" title="对比历史记录" size="440px">
+      <div v-loading="historyLoading" class="history-wrap">
+        <template v-if="historyDetail">
+          <div class="history-back" @click="historyDetail = null">← 返回列表</div>
+          <div class="history-title">{{ historyDetail.company_names }}</div>
+          <div class="history-time">{{ formatTime(historyDetail.created_at) }}</div>
+          <CompareResult :table="historyDetail.table" :analysis="historyDetail.analysis" />
+        </template>
+        <template v-else>
+          <el-empty v-if="!historyList.length" description="暂无对比历史" :image-size="60" />
+          <div v-for="h in historyList" :key="h.id" class="history-item">
+            <div class="history-main" @click="openHistoryDetail(h.id)">
+              <div class="history-company">{{ h.company_names }}</div>
+              <div class="history-time">{{ formatTime(h.created_at) }}</div>
+            </div>
+            <el-button size="small" text type="danger" @click="removeHistory(h.id)">删除</el-button>
+          </div>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -198,6 +222,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
   Check,
+  Clock,
   DataAnalysis,
   MagicStick,
   Plus,
@@ -207,9 +232,14 @@ import {
 import {
   compareOffers,
   createOffer,
+  deleteCompareHistory,
   deleteOffer,
+  getCompareHistory,
+  listCompareHistory,
   listOffers,
+  streamCompareAnalysis,
 } from '@/api/offer'
+import CompareResult from '@/components/offer/CompareResult.vue'
 import WizardStepper from '@/components/wizard/WizardStepper.vue'
 
 const commonCities = ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', '苏州', '西安']
@@ -227,8 +257,15 @@ const form = reactive({
 })
 
 const offers = ref([])
+const selectedIds = ref([])
 const compare = ref({ table: [], analysis: '' })
 const comparing = ref(false)
+
+// ── 对比历史 ──
+const historyOpen = ref(false)
+const historyList = ref([])
+const historyDetail = ref(null)
+const historyLoading = ref(false)
 
 // ── 向导状态 ──
 const wizardSteps = [
@@ -239,8 +276,8 @@ const currentStep = ref(1)
 const maxStep = ref(1)
 
 function goNext() {
-  if (offers.value.length < 2) {
-    ElMessage.warning('至少需要 2 个 Offer 才能对比')
+  if (selectedIds.value.length < 2) {
+    ElMessage.warning('请至少勾选 2 个 Offer 再对比')
     return
   }
   runCompare()
@@ -269,26 +306,69 @@ function balanceType(v) {
   return 'danger'
 }
 
-function isBest(field, i) {
-  const t = compare.value.table
-  const row = t.find((r) => r.field === field)
-  if (!row) return false
-  const values = row.values.map((v) => Number(String(v).replace(/[^\d.]/g, '')) || 0)
-  if (field.includes('生活平衡')) {
-    return values[i] === Math.max(...values) && values[i] > 0
+// ── 多选 ──
+function toggleSelect(id, checked) {
+  if (checked) {
+    if (!selectedIds.value.includes(id)) selectedIds.value.push(id)
+  } else {
+    selectedIds.value = selectedIds.value.filter((x) => x !== id)
   }
-  if (values[i] === Math.max(...values) && values[i] > 0) {
-    return true
+}
+
+function toggleSelectAll() {
+  if (selectedIds.value.length === offers.value.length) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = offers.value.map((o) => o.id)
   }
-  return false
 }
 
 async function loadOffers() {
   try {
     offers.value = await listOffers()
+    // 过滤掉已被删除的勾选，避免提交失效 id
+    const valid = new Set(offers.value.map((o) => o.id))
+    selectedIds.value = selectedIds.value.filter((id) => valid.has(id))
   } catch {
     /* 忽略 */
   }
+}
+
+// ── 对比历史 ──
+async function openHistory() {
+  historyOpen.value = true
+  historyDetail.value = null
+  historyLoading.value = true
+  try {
+    historyList.value = await listCompareHistory()
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function openHistoryDetail(id) {
+  historyLoading.value = true
+  try {
+    historyDetail.value = await getCompareHistory(id)
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function removeHistory(id) {
+  try {
+    await ElMessageBox.confirm('确定删除这条对比历史？', '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
+  await deleteCompareHistory(id)
+  ElMessage.success('已删除')
+  historyList.value = historyList.value.filter((h) => h.id !== id)
+}
+
+function formatTime(t) {
+  if (!t) return ''
+  return new Date(t).toLocaleString('zh-CN', { hour12: false })
 }
 
 async function saveOffer() {
@@ -324,10 +404,21 @@ async function removeOffer(o) {
 async function runCompare() {
   comparing.value = true
   try {
-    compare.value = await compareOffers()
+    const res = await compareOffers(selectedIds.value)
+    compare.value = { table: res.table || [], analysis: res.analysis || '' }
     currentStep.value = 2
     maxStep.value = 2
+    // 表格秒出；AI 分析未命中缓存时通过 SSE 流式补全（打字机显示）
+    if (res.record_id && !res.analysis) {
+      await streamCompareAnalysis(res.record_id, (chunk) => {
+        compare.value = { ...compare.value, analysis: compare.value.analysis + chunk }
+      })
+    }
     ElMessage.success('对比分析完成')
+  } catch (e) {
+    if (e?.response?.status === 400) {
+      ElMessage.warning('AI 分析暂不可用，已展示基础对比结果')
+    }
   } finally {
     comparing.value = false
   }
@@ -549,37 +640,85 @@ onMounted(() => {
   gap: 6px;
   flex-shrink: 0;
 }
-.cmp-table {
-  width: 100%;
+
+/* ── 多选 ── */
+.select-all {
+  margin-left: 10px;
+  font-weight: 400;
 }
-.best {
-  color: #67c23a;
-  font-weight: 700;
+.offer-check {
+  flex-shrink: 0;
+  margin-right: 4px;
 }
-.total {
+
+/* ── 对比历史 ── */
+.history-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 13px;
+  color: #606266;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.history-btn:hover {
+  color: #1a1a1a;
+  border-color: #1a1a1a;
+}
+.history-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.history-back {
+  font-size: 13px;
+  color: #409eff;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.history-back:hover {
+  text-decoration: underline;
+}
+.history-title {
+  font-size: 15px;
   font-weight: 700;
   color: #303133;
 }
-.best-hint {
-  margin-top: 8px;
+.history-time {
   font-size: 12px;
-  color: #c0c4cc;
+  color: #909399;
 }
-.section-title {
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #e4e7ed;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.history-item:hover {
+  border-color: var(--app-brand, #1a1a1a);
+}
+.history-main {
+  flex: 1;
+  min-width: 0;
+}
+.history-company {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
-  margin: 20px 0 10px;
-}
-.analysis-box {
-  background: #f0f7ff;
-  border: 1px solid #d6e9ff;
-  border-radius: 8px;
-  padding: 14px 16px;
-  font-size: 13px;
-  color: #303133;
-  line-height: 1.8;
-  white-space: pre-wrap;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ==================== 深色液态玻璃覆盖 ==================== */
@@ -617,12 +756,21 @@ onMounted(() => {
 .offer-item:hover { border-color: rgba(90, 208, 230, 0.4); }
 .offer-title { color: var(--app-text); }
 .offer-sub { color: var(--app-text-secondary); }
-.best { color: var(--app-success); }
-.total { color: var(--app-text); }
-.section-title { color: var(--app-text); }
-.analysis-box {
-  background: var(--app-brand-soft);
-  border: 1px solid rgba(90, 208, 230, 0.25);
-  color: var(--app-text);
+.history-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-secondary);
 }
+.history-btn:hover {
+  color: var(--app-cyan);
+  border-color: rgba(90, 208, 230, 0.4);
+}
+.history-title { color: var(--app-text); }
+.history-company { color: var(--app-text); }
+.history-time { color: var(--app-text-muted); }
+.history-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--app-border);
+}
+.history-item:hover { border-color: rgba(90, 208, 230, 0.4); }
 </style>

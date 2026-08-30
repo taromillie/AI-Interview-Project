@@ -24,3 +24,21 @@ class Offer(Base):
     benefits: Mapped[str] = mapped_column(Text, default="")     # 福利（公积金、餐补等）
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class OfferCompareRecord(Base):
+    """一次 Offer 对比的历史记录。
+
+    保存快照（offer_ids / 公司名 / 对比表 / AI 建议），即使之后删除 Offer，
+    历史记录仍可完整回看。
+    """
+
+    __tablename__ = "offer_compare_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    offer_ids: Mapped[str] = mapped_column(Text, default="")  # JSON 数组快照
+    company_names: Mapped[str] = mapped_column(String(255), default="")  # 如 "腾讯 vs 阿里"
+    table_json: Mapped[str] = mapped_column(Text, default="")  # 对比表 JSON 快照
+    analysis: Mapped[str] = mapped_column(Text, default="")  # AI 综合建议快照
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
