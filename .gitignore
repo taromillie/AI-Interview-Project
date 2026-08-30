@@ -54,3 +54,6 @@ logs/
 frontend - 副本/
 *.db.bak-*
 c931ba8045cc99fb14e26729656bd605.jpg
+
+# 本地开发一键启动脚本（仅本机使用）
+start_dev.py
