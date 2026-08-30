@@ -18,7 +18,8 @@
           <div class="card-main">
             <div class="card-title">
               {{ it.position_name || it.target_position || '未指定岗位' }}
-              <el-tag v-if="it.report_id" size="small" type="success" effect="light">已复盘</el-tag>
+              <el-tag v-if="it.report_generating" size="small" type="warning" effect="light">分析中</el-tag>
+              <el-tag v-else-if="it.report_id" size="small" type="success" effect="light">已复盘</el-tag>
               <el-tag v-else-if="it.status === 'reported'" size="small" type="warning" effect="light">已结束</el-tag>
               <el-tag v-else size="small" effect="plain" type="info">{{ statusText(it.status) }}</el-tag>
             </div>
@@ -31,7 +32,10 @@
             </div>
           </div>
           <div class="card-side">
-            <div v-if="it.overall_score != null" class="score-box">
+            <div v-if="it.report_generating" class="score-box pending">
+              <div class="score-pending">分析中</div>
+            </div>
+            <div v-else-if="it.overall_score != null" class="score-box">
               <div class="score">{{ Math.round(it.overall_score) }}</div>
               <div class="score-label">分</div>
             </div>
@@ -71,7 +75,10 @@
                 <span>{{ detail.messages.length }} 条对话</span>
               </div>
             </div>
-            <div v-if="detail.overall_score != null" class="ov-score">
+            <div v-if="detail.report_generating" class="ov-score pending">
+              <div class="score-pending">分析中</div>
+            </div>
+            <div v-else-if="detail.overall_score != null" class="ov-score">
               <div class="score">{{ Math.round(detail.overall_score) }}</div>
               <div class="score-label">综合得分</div>
             </div>
@@ -101,7 +108,10 @@
           <!-- 复盘报告 -->
           <template v-if="detail.report">
             <div class="section-title">复盘报告</div>
-            <div class="report-card">
+            <div v-if="detail.report_generating" class="no-report">
+              报告正在生成中，请耐心等待分析完成，稍后刷新即可查看。
+            </div>
+            <div v-else class="report-card">
               <div class="rep-dims">
                 <div v-for="(v, k) in detail.report.dimensions" :key="k" class="dim-row">
                   <span class="dim-name">{{ DIM_LABELS[k] || k }}</span>
@@ -333,6 +343,12 @@ onMounted(load)
 .score-label {
   font-size: 12px;
   color: var(--app-text-muted);
+}
+.score-pending {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--app-amber);
+  white-space: nowrap;
 }
 .dot {
   color: var(--app-border-strong);

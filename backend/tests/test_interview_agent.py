@@ -189,3 +189,102 @@ class TestSignalStrategy:
         s = analyze_signals("我用 Python 写了爬虫，抓取电商数据并清洗入库", hit_score=0, probe_streak=0)
         assert s.weak_recall is True
         assert s.exhausted_topic is False
+
+    def test_analyze_signals_recall_disabled(self):
+        # enable_recall=False（谈薪等内置问题库模式）时不触发弱召回
+        s = analyze_signals(
+            "我用 Python 写了爬虫，抓取电商数据并清洗入库", hit_score=0, enable_recall=False
+        )
+        assert s.weak_recall is False
+
+
+# ── 谈薪模式（v1.2：interview_type=salary） ──
+class TestSalaryMode:
+    async def test_salary_uses_salary_decision_prompt(self):
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interview_type="salary")
+        await ag.decide_next(**DECIDE_KWARGS)
+        text = llm.last_messages[0].content
+        assert "谈薪" in text
+        assert "期望薪资" in text
+        assert "不是技术面试" in text
+
+    async def test_normal_mode_keeps_technical_prompt(self):
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interview_type="normal")
+        await ag.decide_next(**DECIDE_KWARGS)
+        text = llm.last_messages[0].content
+        assert "谈薪" not in text
+
+    async def test_salary_opening_uses_salary_greeting(self):
+        ag = InterviewAgent(FakeLLM(None), interview_type="salary")
+        text = await ag.opening("Python 后端工程师")
+        assert "谈薪" in text
+        assert "薪资" in text
+
+    async def test_salary_fallback_normalizes_technical_probe(self):
+        # 谈薪模式回退时，deep_dive/project_probe 归一为普通追问
+        ag = InterviewAgent(FakeLLM(RuntimeError("超时")), interview_type="salary")
+        signals = DecisionSignals(has_project_hint=True)
+        d = ag.fallback_decision(["问题1"], asked_rounds=1, max_rounds=6, signals=signals)
+        assert d["strategy"] == "probe"
+
+
+# ── 面试官专属模式（v1.3：interviewer_name 覆盖 interview_type） ──
+class TestInterviewerModeOverride:
+    async def test_cto_uses_architect_prompt(self):
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interviewer_name="CTO 技术面")
+        await ag.decide_next(**DECIDE_KWARGS)
+        text = llm.last_messages[0].content
+        assert "CTO" in text
+        assert "trade-off" in text
+
+    async def test_hr_uses_hr_prompt_and_bank_source(self):
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interviewer_name="HR 综合面")
+        assert ag.question_source == "hr_bank"
+        await ag.decide_next(**DECIDE_KWARGS)
+        text = llm.last_messages[0].content
+        assert "STAR" in text
+        assert "不是技术面试" in text
+
+    async def test_pressure_uses_pressure_prompt(self):
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interviewer_name="压力面")
+        assert ag.question_source == "knowledge"
+        await ag.decide_next(**DECIDE_KWARGS)
+        text = llm.last_messages[0].content
+        assert "压力面试" in text
+        assert "质疑" in text
+
+    async def test_switch_uses_switch_prompt_and_bank(self):
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interviewer_name="转行质疑面试官")
+        assert ag.question_source == "switch_bank"
+        await ag.decide_next(**DECIDE_KWARGS)
+        text = llm.last_messages[0].content
+        assert "转行" in text
+        assert "可迁移" in text
+
+    async def test_switch_type_without_name_also_uses_switch_prompt(self):
+        # 不传面试官名、仅 interview_type=switch 时，同样命中转行配置
+        llm = FakeLLM({"action": "finish", "strategy": "none", "question": "", "reason": "ok"})
+        ag = InterviewAgent(llm, interview_type="switch")
+        assert ag.question_source == "switch_bank"
+        await ag.decide_next(**DECIDE_KWARGS)
+        assert "转行" in llm.last_messages[0].content
+
+    async def test_all_type_falls_back_to_normal(self):
+        # 前端 all 类型无专属模式键 → 兜底 normal
+        ag = InterviewAgent(FakeLLM(None), interview_type="all")
+        assert ag.question_source == "knowledge"
+        text = await ag.opening("Python 后端工程师")
+        assert "自我介绍" in text
+
+    def test_non_bank_mode_normalizes_technical_probe(self):
+        # 综合/转行模式回退时，deep_dive/project_probe 归一为普通追问
+        ag = InterviewAgent(FakeLLM(RuntimeError("超时")), interviewer_name="HR 综合面")
+        signals = DecisionSignals(has_project_hint=True)
+        d = ag.fallback_decision(["问题1"], asked_rounds=1, max_rounds=6, signals=signals)
+        assert d["strategy"] == "probe"

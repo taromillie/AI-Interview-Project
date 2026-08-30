@@ -29,7 +29,7 @@ from app.schemas.interview import (
     InterviewMessageOut,
     InterviewOut,
 )
-from app.services.interview_orchestrator import InterviewOrchestrator
+from app.services.interview_orchestrator import InterviewOrchestrator, REPORT_PENDING_SUMMARY
 from app.services.llm_utils import require_llm
 from app.repositories import InterviewRepository
 
@@ -73,6 +73,8 @@ def _make_out(db: Session, interview: Interview) -> InterviewOut:
         report_id=report.id if report else None,
         overall_score=report.overall_score if report else None,
         message_count=message_count or 0,
+        # 占位报告（summary 为固定占位文案）说明复盘仍在后台生成，前端据此展示“分析中”
+        report_generating=bool(report and report.summary == REPORT_PENDING_SUMMARY),
     )
 
 

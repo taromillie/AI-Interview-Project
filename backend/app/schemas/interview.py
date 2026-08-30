@@ -33,6 +33,7 @@ class InterviewOut(BaseModel):
     report_id: int | None = None
     overall_score: float | None = None
     message_count: int | None = None
+    report_generating: bool = False  # 占位报告（复盘生成中）标记，前端据此展示“分析中”
 
 
 class InterviewMessageOut(BaseModel):

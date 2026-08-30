@@ -91,7 +91,7 @@
                 </div>
                 <div class="iv-persona">{{ iv.persona || '专业、严谨，关注你的真实能力。' }}</div>
                 <div class="iv-tags">
-                  <span class="iv-tag">{{ typeText(iv.interview_type) }}</span>
+                  <span class="iv-tag">{{ typeText(iv) }}</span>
                   <span class="iv-tag">{{ biasText(iv.difficulty_bias) }}</span>
                 </div>
               </button>
@@ -379,6 +379,9 @@ const connAction = ref(null)
 // 打字机定时器集合（onUnmounted 时统一清理）
 let typeTimers = []
 
+// 面试结束后延迟跳转面试记录页的定时器（onUnmounted 时清理，避免跳转前用户已离开）
+let farewellTimer = null
+
 // SSE 流控制：切换页面时中断所有进行中的流，
 // 避免后台回调在组件卸载后继续创建定时器 / 语音播报，造成内存泄漏
 let sseController = null
@@ -547,8 +550,21 @@ function positionMeta(p) {
   return `${dir} ${d}`.trim()
 }
 
-function typeText(t) {
-  return { all: '通用', normal: '常规面', switch: '转行面', salary: '谈薪面' }[t] || t
+function typeText(iv) {
+  // 内置面试官按名称显示精确标签（后端按名称命中专属模式）
+  const byName = {
+    资深技术面试官: '技术面',
+    'CTO 技术面': '架构面',
+    'HR 综合面': '综合面',
+    压力面: '压力面',
+    转行质疑面试官: '转行面',
+    '谈薪 HR': '谈薪面',
+  }
+  if (iv && typeof iv === 'object') {
+    if (iv.name && byName[iv.name]) return byName[iv.name]
+    return { all: '通用', normal: '常规面', switch: '转行面', salary: '谈薪面' }[iv.interview_type] || iv.interview_type || ''
+  }
+  return iv || ''
 }
 function biasText(b) {
   return b === 1 ? '偏难' : b === -1 ? '偏易' : '难度中性'
@@ -586,9 +602,14 @@ function goStep(n) {
 async function createSession() {
   creating.value = true
   try {
+    // v1.2：面试类型跟随所选面试官（normal/switch/salary），不再硬编码
+    // 面试官 interview_type 可能为 'all'（通用），归一为 normal 以通过后端校验
+    const selectedIv = interviewers.value.find((x) => x.id === selectedInterviewerId.value)
+    const rawType = selectedIv?.interview_type || 'normal'
+    const interview_type = ['normal', 'switch', 'salary'].includes(rawType) ? rawType : 'normal'
     const payload = {
       mode: answerMode.value,
-      interview_type: 'normal',
+      interview_type,
       max_rounds: maxRounds.value,
       difficulty: selectedDifficulty.value,
       interviewer_id: selectedInterviewerId.value,
@@ -629,6 +650,7 @@ async function beginChat() {
           pushAiMessage(data?.question)
         } else if (event === 'finished') {
           waitingAnswer.value = false
+          scheduleGoHistory()
         }
       },
     })
@@ -648,11 +670,14 @@ async function beginChat() {
 }
 
 // ── 打字机效果：question 逐字展示，点击气泡可跳过 ──
-function pushAiMessage(content) {
+// opts.unlock=false 用于面试结束语：只打字展示，不打字结束后恢复作答 / 自动开麦
+function pushAiMessage(content, opts = {}) {
   if (!content) return
+  const autoUnlock = opts.unlock !== false
   // push 后从响应式数组中取回 proxy 引用，否则修改 msg.shown 不会触发视图更新
   chatMessages.value.push(createAiMessage(content))
   const msg = chatMessages.value[chatMessages.value.length - 1]
+  msg._autoUnlock = autoUnlock
   speakText(content)
   // 约 2.5 秒打完整段（步长按文本长度自适应）
   const step = typewriterStep(content.length)
@@ -667,9 +692,11 @@ function pushAiMessage(content) {
       msg._timer = null
       msg.typing = false
       msg.shown = content
-      waitingAnswer.value = true
-      // 语音/视频模式：问题已完整显示，自动开麦让用户直接回答
-      maybeAutoStartMic()
+      if (autoUnlock) {
+        waitingAnswer.value = true
+        // 语音/视频模式：问题已完整显示，自动开麦让用户直接回答
+        maybeAutoStartMic()
+      }
     }
   }, TYPEWRITER_TICK_MS)
   msg._timer = timer
@@ -685,8 +712,10 @@ function skipTyping(msg) {
   }
   msg.typing = false
   msg.shown = msg.full
-  waitingAnswer.value = true
-  maybeAutoStartMic()
+  if (msg._autoUnlock !== false) {
+    waitingAnswer.value = true
+    maybeAutoStartMic()
+  }
   scrollToBottom()
 }
 
@@ -835,10 +864,14 @@ async function sendAnswer() {
         if (isUnmounted) return
         if (event === 'question') {
           pushAiMessage(data?.question)
-        } else         if (event === 'finished') {
+        } else if (event === 'farewell') {
+          // 面试结束语：打字机展示为 AI 气泡，但不解锁输入框、不自动开麦
+          pushAiMessage(data?.message, { unlock: false })
+        } else if (event === 'finished') {
           const detail = data || {}
           ElMessage.success(detail.message || '面试结束，报告正在生成')
           waitingAnswer.value = false
+          scheduleGoHistory()
         }
       },
     })
@@ -873,14 +906,30 @@ async function endEarly() {
   }
   ending.value = true
   try {
-    await finishInterview(interviewId.value)
+    const res = await finishInterview(interviewId.value)
+    const farewell = res?.farewell
+    if (farewell) pushAiMessage(farewell, { unlock: false })
     ElMessage.success('面试已结束，报告正在生成')
   } catch {
     ElMessage.warning('面试已结束')
   } finally {
     ending.value = false
   }
-  session.value = null
+  scheduleGoHistory()
+}
+
+// 面试结束（自动到轮数 / 手动结束）：告别语展示数秒后自动跳转面试记录页。
+// 定时器幂等：结束事件与手动结束可能先后触发，只允许排定一次跳转。
+function scheduleGoHistory() {
+  if (farewellTimer || isUnmounted) return
+  farewellTimer = setTimeout(() => {
+    farewellTimer = null
+    if (isUnmounted) return
+    stopSpeak()
+    stopRecording()
+    session.value = null
+    router.push({ name: 'history' })
+  }, 3500)
 }
 
 function scrollToBottom() {
@@ -913,6 +962,10 @@ onUnmounted(() => {
     sseController = null
   }
   stopSpeak()
+  if (farewellTimer) {
+    clearTimeout(farewellTimer)
+    farewellTimer = null
+  }
   for (const t of typeTimers) clearInterval(t)
   typeTimers = []
   if (recognition) {

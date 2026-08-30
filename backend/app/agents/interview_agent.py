@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Any
 
-from app.agents.prompts import DECISION_PROMPT, OPENING_QUESTION, build_interviewer_sections
+from app.agents.prompts import INTERVIEWER_MODE_OVERRIDES, MODE_CONFIGS, build_interviewer_sections
 from app.llm.base import ChatMessage, LLMProvider
 from app.rag.next_question_decision import DecisionSignals, build_signal_section, decide_strategy
 
@@ -40,6 +40,12 @@ class InterviewAgent:
 
     persona/style/difficulty：面试官角色与难度档位（v1.1），
     未配置时为空/默认值，保持原有通用人设与标准难度。
+    interview_type：面试模式枚举（normal/switch/salary 等，v1.2），
+    决定使用哪套决策提示词与开场白（见 prompts.MODE_CONFIGS），默认 normal。
+    interviewer_name：内置面试官名（v1.3），优先命中 INTERVIEWER_MODE_OVERRIDES 专属配置，
+    其次按 interview_type 查 MODE_CONFIGS，最后兜底 normal。
+    question_source：当前模式的问题来源键（knowledge=技术题库检索，*_bank=内置问题库），
+    由编排器据此装配候选问题。
     """
 
     def __init__(
@@ -48,11 +54,20 @@ class InterviewAgent:
         persona: str = "",
         style: str = "",
         difficulty: str = "normal",
+        interview_type: str = "normal",
+        interviewer_name: str = "",
     ):
         self._llm = llm
         self._persona = persona
         self._style = style
         self._difficulty = difficulty
+        self._interview_type = interview_type
+        self._interviewer_name = interviewer_name
+        self.mode_key = INTERVIEWER_MODE_OVERRIDES.get(interviewer_name) or interview_type
+        config = MODE_CONFIGS.get(self.mode_key) or MODE_CONFIGS["normal"]
+        self._decision_prompt = config["decision_prompt"]
+        self._opening_template = config["opening"]
+        self.question_source = config.get("question_source", "knowledge")
         self._interviewer_sections = build_interviewer_sections(persona, style, difficulty)
 
     async def decide_next(
@@ -78,7 +93,7 @@ class InterviewAgent:
         """
         candidates_text = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(candidates[:8])) or "（暂无，可自行拟定）"
         signal_section = build_signal_section(signals) if signals else ""
-        prompt = DECISION_PROMPT.format(
+        prompt = self._decision_prompt.format(
             position_name=position_name,
             interviewer_sections=self._interviewer_sections or "（按通用面试官人设与标准难度进行）",
             position_skills="、".join(position_skills[:12]) or "（未提供）",
@@ -134,6 +149,9 @@ class InterviewAgent:
         if not candidates:
             return {"action": "finish", "strategy": "none", "question": "", "reason": "题库已耗尽"}
         strategy = decide_strategy(signals, self._difficulty) if signals else "none"
+        if self.question_source != "knowledge" and strategy in ("deep_dive", "project_probe"):
+            # 谈薪/综合/转行模式无技术深挖/项目追问概念，归一为普通追问
+            strategy = "probe"
         reason = "规则回退：按题库顺序出题"
         if strategy == "switch_topic" and probe_streak >= 2:
             reason = "规则回退：连续追问过深，转向未覆盖方向"
@@ -148,7 +166,7 @@ class InterviewAgent:
 
     async def opening(self, position_name: str) -> str:
         """生成开场问题（固定开场白 + 可选角色开场白，保证稳定）。"""
-        base = OPENING_QUESTION.format(position_name=position_name)
+        base = self._opening_template.format(position_name=position_name)
         if self._persona and self._difficulty == "hard":
             # 困难档 + 有角色设定：在开场追加一句角色化的开场白
             return f"{base}\n\n（本场为高难度面试，问题会更有挑战性，请做好准备。）"

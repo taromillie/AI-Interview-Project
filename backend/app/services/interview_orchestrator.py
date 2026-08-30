@@ -13,6 +13,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.agents.interview_agent import InterviewAgent
+from app.agents.prompts import BANK_SOURCES
 from app.agents.tools import (
     ToolCallGuard,
     get_coverage,
@@ -71,6 +72,8 @@ class InterviewOrchestrator:
             persona=interviewer.persona if interviewer else "",
             style=interviewer.style if interviewer else "",
             difficulty=interview.difficulty or "normal",
+            interview_type=interview.interview_type or "normal",
+            interviewer_name=interviewer.name if interviewer else "",
         )
 
     # ---------- 内部工具 ----------
@@ -152,6 +155,10 @@ class InterviewOrchestrator:
             return str(target)
         return self.position.name if self.position else "通用岗位"
 
+    def _question_source(self) -> str:
+        """当前面试官命中的问题来源键（knowledge=技术题库检索；*_bank=内置问题库）。"""
+        return self.agent.question_source
+
     def _farewell_text(self) -> str:
         import random
 
@@ -209,38 +216,49 @@ class InterviewOrchestrator:
         guard = ToolCallGuard()
         embedder = get_embedding_provider()
 
-        # 工具① 候选检索（向量增强 + 关键词降级）
-        tool_res = await search_knowledge(
-            self.db,
-            self.interview.position_id,
-            asked_ids,
-            answer_text=content,
-            top_n=8,
-            embedder=embedder,
-            guard=guard,
-        )
-        candidates = tool_res.data or []
-        candidate_texts = [c.question for c in candidates]
+        source = self._question_source()
+        bank = BANK_SOURCES.get(source)
+        if bank is not None:
+            # 内置问题库模式（谈薪/综合/转行）：候选来自对应题库（剔除已问），不检索技术题库
+            asked_texts = {m.content for m in self._messages() if m.role == "assistant"}
+            candidate_texts = [q for q in bank if q not in asked_texts]
+            candidates: list = []
+            hit = 0
+            coverage_hint = ""
+        else:
+            # 工具① 候选检索（向量增强 + 关键词降级）
+            tool_res = await search_knowledge(
+                self.db,
+                self.interview.position_id,
+                asked_ids,
+                answer_text=content,
+                top_n=8,
+                embedder=embedder,
+                guard=guard,
+            )
+            candidates = tool_res.data or []
+            candidate_texts = [c.question for c in candidates]
+
+            # 工具③ 技能覆盖度提示（辅助换话题方向）
+            coverage_res = get_coverage(
+                self._position_skills(),
+                [m.content for m in self._messages() if m.role == "assistant"],
+                guard=guard,
+            )
+            coverage = coverage_res.data or {}
+            coverage_hint = coverage.get("hint", "")
+            hit = max((hit_score(c, content) for c in candidates), default=0)
 
         # 工具② 简历证据（优先于静态 brief，保证决策上下文新鲜）
         resume_evidence = get_resume_evidence(self.resume, guard=guard).data or ""
 
-        # 工具③ 技能覆盖度提示（辅助换话题方向）
-        coverage_res = get_coverage(
-            self._position_skills(),
-            [m.content for m in self._messages() if m.role == "assistant"],
-            guard=guard,
-        )
-        coverage = coverage_res.data or {}
-        coverage_hint = coverage.get("hint", "")
-
         # ---- 工作包 A：四信号决策 ----
-        hit = max((hit_score(c, content) for c in candidates), default=0)
         signals = analyze_signals(
             content,
             hit_score=hit,
             probe_streak=probe_streak,
             avoid_streak=self._avoid_streak(),
+            enable_recall=source == "knowledge",
         )
 
         decision = await self.agent.decide_next(
@@ -256,6 +274,10 @@ class InterviewOrchestrator:
             signals=signals,
             coverage_hint=coverage_hint,
         )
+
+        # 内置问题库模式（谈薪/综合/转行）：技术面试专用策略归一为普通追问
+        if source != "knowledge" and decision.get("strategy") == "project_probe":
+            decision["strategy"] = "probe"
 
         # 强制兜底：同一方向已连续追问超过上限，必须切换话题，不再死磕
         if decision.get("strategy") in PROBE_STRATEGIES and probe_streak >= MAX_PROBE_STREAK:

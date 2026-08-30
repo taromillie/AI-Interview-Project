@@ -74,6 +74,7 @@ def analyze_signals(
     probe_streak: int = 0,
     avoid_streak: int = 0,
     max_probe_streak: int = MAX_PROBE_STREAK,
+    enable_recall: bool = True,
 ) -> DecisionSignals:
     """分析四类信号。
 
@@ -83,11 +84,14 @@ def analyze_signals(
         probe_streak: 当前话题已连续追问轮数。
         avoid_streak: 已连续低信息/回避的回答轮数。
         max_probe_streak: 话题追问上限。
+        enable_recall: 是否启用"弱召回"信号（v1.2）。
+            谈薪等模式候选来自内置问题库而非题库原子，无标签可命中，
+            关闭后可避免"答非所问"误判导致的频繁 remedy 拉回。
     """
     text = latest_answer or ""
     low_info = is_low_information(text)
     # 弱召回：回答有实质内容，但候选题目命中为 0 —— 大概率答非所问/偏题
-    weak_recall = (not low_info) and hit_score <= 0
+    weak_recall = enable_recall and (not low_info) and hit_score <= 0
     exhausted = probe_streak >= max_probe_streak
     project_hint = has_project_hint(text)
 
