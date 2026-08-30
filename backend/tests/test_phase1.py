@@ -3,6 +3,7 @@
 使用 FakeLLM 替换 require_llm，走真实 HTTP 链路（含 SSE），不依赖真实大模型。
 """
 import json
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -188,6 +189,18 @@ def test_interview_full_flow(client: TestClient, authed: dict, fake_llm):
 
     # 到 3 轮上限应已结束
     assert report_id is not None, "达到轮数上限后应自动结束并生成报告"
+
+    # 报告由后台线程生成：轮询状态接口等待完成（与前端轮询一致），避免竞态
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        st = client.get(
+            f"/api/reports/interviews/{interview_id}/status", headers=authed
+        ).json()
+        if st.get("status") == "reported":
+            break
+        time.sleep(0.1)
+    else:
+        pytest.fail("等待报告生成超时")
 
     # 查报告
     resp = client.get(f"/api/reports/{report_id}", headers=authed)
