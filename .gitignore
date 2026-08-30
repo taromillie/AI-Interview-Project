@@ -12,6 +12,8 @@ env/
 
 # 数据库与向量数据
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 data/
 chroma/

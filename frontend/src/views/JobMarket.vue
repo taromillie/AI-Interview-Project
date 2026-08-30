@@ -61,6 +61,10 @@
           <el-icon :size="13" :class="{ spinning: syncing }"><Refresh /></el-icon>
           {{ syncing ? '同步中…' : '立即同步' }}
         </button>
+        <button class="refresh-btn" :class="{ on: onlyFavorite }" @click="onlyFavorite = !onlyFavorite">
+          <el-icon :size="13"><StarFilled v-if="onlyFavorite" /><Star v-else /></el-icon>
+          {{ onlyFavorite ? '仅看已收藏' : '全部岗位' }}
+        </button>
       </div>
     </div>
 
@@ -68,8 +72,21 @@
     <div v-if="filtered.length" class="job-grid">
       <div v-for="j in filtered" :key="j.id" class="job-card" @click="openDetail(j)">
         <div class="job-head">
-          <div class="job-name">{{ j.company || '未标注公司' }}</div>
+          <div class="job-name-row">
+            <div class="job-name">{{ j.company || '未标注公司' }}</div>
+            <button
+              class="fav-btn"
+              :class="{ on: isFav(j.id) }"
+              @click.stop="toggleFavorite(j)"
+              :title="isFav(j.id) ? '取消收藏' : '收藏岗位'"
+            >
+              <el-icon :size="15"><StarFilled v-if="isFav(j.id)" /><Star v-else /></el-icon>
+            </button>
+          </div>
           <div class="job-tags">
+            <el-tag v-if="appStatus(j.id)" size="small" :type="APPLICATION_STATUS[appStatus(j.id)].type" effect="dark">
+              {{ APPLICATION_STATUS[appStatus(j.id)].label }}
+            </el-tag>
             <el-tag size="small" effect="plain">{{ directionText(j.direction) }}</el-tag>
             <el-tag size="small" :type="difficultyType(j.difficulty)" effect="light">
               {{ difficultyText(j.difficulty) }}
@@ -185,6 +202,35 @@
               </span>
             </div>
             <div class="modal-actions">
+              <button
+                class="fav-btn text-btn"
+                :class="{ on: isFav(detail.id) }"
+                @click="toggleFavorite(detail)"
+              >
+                <el-icon :size="15"><StarFilled v-if="isFav(detail.id)" /><Star v-else /></el-icon>
+                {{ isFav(detail.id) ? '已收藏' : '收藏' }}
+              </button>
+              <el-dropdown @command="(c) => setAppStatus(detail, c)">
+                <button class="apply-btn" :class="appStatus(detail.id) ? 'st-' + appStatus(detail.id) : ''">
+                  {{ appStatus(detail.id) ? APPLICATION_STATUS[appStatus(detail.id)].label : '标记投递状态' }}
+                  <el-icon :size="12"><ArrowDown /></el-icon>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item
+                      v-for="(v, k) in APPLICATION_STATUS"
+                      :key="k"
+                      :command="k"
+                      :disabled="k === appStatus(detail.id)"
+                    >
+                      {{ v.label }}
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="appStatus(detail.id)" divided command="__remove__">
+                      移除跟踪
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
               <button class="interview-btn" @click="startInterview(detail)">
                 <el-icon :size="15"><MagicStick /></el-icon>
                 针对此岗位开始模拟面试
@@ -200,8 +246,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Close, Location, MagicStick, Refresh, Search, Wallet, Clock, ArrowRight, Link, Check } from '@element-plus/icons-vue'
+import { ArrowDown, Check, Clock, Close, Link, Location, MagicStick, Refresh, Search, Star, StarFilled, Wallet } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { getJobTrackSummary, favoritePosition, unfavoritePosition, setApplication, removeApplication, APPLICATION_STATUS } from '@/api/jobTrack'
 import { listPositions, syncPositions, getSyncConfig, updateSyncConfig } from '@/api/question'
 import { formatDate, parseDate } from '@/utils/time'
 
@@ -216,6 +263,11 @@ const detail = ref(null)
 const autoInterval = ref(30)
 const nextSyncText = ref('')
 let pollTimer = null
+
+// ── 收藏与投递跟踪 ──
+const favoriteIds = ref(new Set())
+const applicationMap = ref({})
+const onlyFavorite = ref(false)
 
 const directionOptions = [
   { value: '', label: '全部' },
@@ -238,6 +290,7 @@ const filtered = computed(() => {
   return positions.value.filter((j) => {
     if (filterDirection.value && j.direction !== filterDirection.value) return false
     if (filterDifficulty.value && j.difficulty !== filterDifficulty.value) return false
+    if (onlyFavorite.value && !favoriteIds.value.has(j.id)) return false
     if (kw) {
       const haystack = [j.name, j.company, j.city, j.direction, ...(j.skills || [])].join(' ').toLowerCase()
       if (!haystack.includes(kw)) return false
@@ -286,6 +339,58 @@ function fmtDate(v) {
 }
 
 function applyFilter() {}
+
+// ── 收藏与投递跟踪 ──
+const isFav = (id) => favoriteIds.value.has(id)
+const appStatus = (id) => (applicationMap.value[id] ? applicationMap.value[id].status : '')
+
+async function loadTrack() {
+  try {
+    const s = await getJobTrackSummary()
+    favoriteIds.value = new Set(s.favorite_ids || [])
+    applicationMap.value = s.applications || {}
+  } catch {
+    /* 忽略，未登录或接口暂不可用时静默 */
+  }
+}
+
+async function toggleFavorite(j) {
+  try {
+    if (isFav(j.id)) {
+      await unfavoritePosition(j.id)
+      favoriteIds.value = new Set([...favoriteIds.value].filter((x) => x !== j.id))
+      ElMessage.success('已取消收藏')
+    } else {
+      await favoritePosition(j.id)
+      favoriteIds.value = new Set([...favoriteIds.value, j.id])
+      ElMessage.success('已收藏')
+    }
+  } catch {
+    ElMessage.warning('操作失败，请稍后再试')
+  }
+}
+
+async function setAppStatus(j, status) {
+  if (status === '__remove__') {
+    try {
+      await removeApplication(j.id)
+      const next = { ...applicationMap.value }
+      delete next[j.id]
+      applicationMap.value = next
+      ElMessage.success('已移除投递跟踪')
+    } catch {
+      ElMessage.warning('操作失败，请稍后再试')
+    }
+    return
+  }
+  try {
+    await setApplication(j.id, status)
+    applicationMap.value = { ...applicationMap.value, [j.id]: { status } }
+    ElMessage.success(`已标记为「${APPLICATION_STATUS[status].label}」`)
+  } catch {
+    ElMessage.warning('操作失败，请稍后再试')
+  }
+}
 
 // ── 自动同步配置 ──
 function fmtNextSync(iso) {
@@ -377,6 +482,7 @@ onMounted(async () => {
     loading.value = false
   }
   loadSyncConfig()
+  loadTrack()
   startPolling()
 })
 
@@ -546,6 +652,10 @@ onUnmounted(() => {
   opacity: 0.6;
   cursor: not-allowed;
 }
+.refresh-btn.on {
+  border-color: rgba(242, 193, 78, 0.6);
+  color: #f2c14e;
+}
 .spinning {
   animation: spin 1s linear infinite;
 }
@@ -583,11 +693,45 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 8px;
 }
+.job-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .job-name {
   font-size: 16px;
   font-weight: 700;
   color: var(--app-text);
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fav-btn {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--app-text-muted);
+  transition: color 0.18s, transform 160ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+  flex-shrink: 0;
+}
+.fav-btn:hover {
+  color: #f2c14e;
+  transform: scale(1.12);
+}
+.fav-btn:active {
+  transform: scale(0.92);
+}
+.fav-btn.on {
+  color: #f2c14e;
+}
+.fav-btn.on:hover {
+  color: #f8d56a;
 }
 .job-tags {
   display: flex;
@@ -859,10 +1003,64 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--app-text-muted);
 }
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .modal-actions .interview-btn {
   flex: none;
   height: 42px;
   padding: 0 18px;
+}
+.text-btn {
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  height: 42px;
+  padding: 0 14px;
+  gap: 6px;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+.text-btn.on {
+  border-color: rgba(242, 193, 78, 0.55);
+  color: #f2c14e;
+}
+.apply-btn {
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.apply-btn:hover {
+  border-color: rgba(90, 208, 230, 0.5);
+  color: var(--app-text);
+}
+.apply-btn.st-applied {
+  color: var(--app-cyan);
+  border-color: rgba(90, 208, 230, 0.45);
+}
+.apply-btn.st-interviewing {
+  color: var(--app-amber);
+  border-color: rgba(242, 193, 78, 0.45);
+}
+.apply-btn.st-offer {
+  color: var(--app-success);
+  border-color: rgba(67, 217, 163, 0.45);
+}
+.apply-btn.st-rejected {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.45);
 }
 
 /* 弹窗过渡 */

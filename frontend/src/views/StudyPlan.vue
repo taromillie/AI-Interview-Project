@@ -57,6 +57,18 @@
                 {{ q }}
               </button>
             </div>
+            <div v-if="trackJobs.length" class="quick-row track-row">
+              <span class="quick-label">我的岗位</span>
+              <button
+                v-for="tj in trackJobs"
+                :key="tj.id"
+                class="quick-chip"
+                :class="{ on: selectedPositionId === tj.id }"
+                @click="pickTrackJob(tj)"
+              >
+                {{ tj.company }} · {{ tj.name }}
+              </button>
+            </div>
           </section>
 
           <!-- ② 天数 + 简历 -->
@@ -255,6 +267,8 @@ import {
   Odometer,
   RefreshLeft,
 } from '@element-plus/icons-vue'
+import { getJobTrackSummary } from '@/api/jobTrack'
+import { listPositions } from '@/api/question'
 import { listResumes } from '@/api/diagnostic'
 import { formatDateTime } from '@/utils/time'
 import WizardStepper from '@/components/wizard/WizardStepper.vue'
@@ -280,6 +294,10 @@ const generating = ref(false)
 const plans = ref([])
 const current = ref(null)
 const resumes = ref([])
+
+// ── 从收藏 / 投递岗位快捷关联 ──
+const selectedPositionId = ref(null)
+const trackJobs = ref([])
 
 const hotPositions = ['Java 后端开发工程师', '前端开发工程师', '算法工程师', '产品经理', '数据分析师']
 
@@ -344,6 +362,20 @@ async function loadResumes() {
   } catch { /* 忽略 */ }
 }
 
+async function loadTrackJobs() {
+  try {
+    const [summary, all] = await Promise.all([getJobTrackSummary(), listPositions()])
+    const ids = new Set(summary.favorite_ids || [])
+    for (const pid of Object.keys(summary.applications || {})) ids.add(Number(pid))
+    trackJobs.value = all.filter((p) => ids.has(p.id))
+  } catch { /* 忽略，未登录时静默 */ }
+}
+
+function pickTrackJob(tj) {
+  selectedPositionId.value = tj.id
+  targetPosition.value = tj.name
+}
+
 async function runGenerate() {
   generating.value = true
   try {
@@ -351,6 +383,7 @@ async function runGenerate() {
       target_position: targetPosition.value.trim(),
       days: days.value,
       resume_id: resumeId.value === 0 ? undefined : resumeId.value,
+      position_id: selectedPositionId.value || undefined,
     })
     ElMessage.success('备战计划已生成')
     await loadPlans()
@@ -373,7 +406,7 @@ async function toggleTask(day, done) {
 
 async function removePlan() {
   if (!current.value) return
-  await ElMessageBox.confirm('确定删除该备战计划？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确定删除该备战计划？', '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
   await deleteStudyPlan(current.value.id)
   current.value = null
   ElMessage.success('已删除')
@@ -387,6 +420,7 @@ function formatTime(dt) {
 onMounted(() => {
   loadPlans()
   loadResumes()
+  loadTrackJobs()
 })
 </script>
 
@@ -540,6 +574,11 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
+}
+.track-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.14);
 }
 .quick-label {
   font-size: 12px;

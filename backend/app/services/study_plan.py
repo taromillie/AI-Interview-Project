@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.agents.prompts import STUDY_PLAN_PROMPT
 from app.llm.base import ChatMessage, LLMProvider
 from app.models.career import AbilityProfile
+from app.models.position import Position
 from app.models.resume import Resume
 from app.models.study import StudyPlan
 
@@ -70,9 +71,19 @@ async def generate_study_plan(
     target_position: str,
     days: int,
     resume: Resume | None,
+    position_id: int | None = None,
 ) -> StudyPlan:
-    """生成备战计划并落库。"""
+    """生成备战计划并落库。
+
+    position_id 可选：自动回填目标岗位名称，并将岗位关键技能并入学习上下文。
+    """
     days = max(3, min(int(days), 60))
+
+    # 关联岗位：回填目标岗位与关键技能
+    position = db.get(Position, position_id) if position_id else None
+    if not target_position and position is not None:
+        target_position = position.name
+    position_skills = list((position.required_skills or []) if position else [])
 
     # 收集能力画像缺口
     profile = db.scalar(
@@ -92,7 +103,7 @@ async def generate_study_plan(
             if isinstance(v, (int, float)) and v < 70:
                 weak_points.append(f"技能「{k}」得分 {v:.0f}")
 
-    skills = resume.skills if resume else []
+    skills = list(dict.fromkeys((resume.skills if resume else []) + position_skills))[:30]
     brief = (resume.raw_text or "")[:300] if resume else "（未提供简历）"
 
     prompt = STUDY_PLAN_PROMPT.format(
@@ -141,6 +152,7 @@ async def generate_study_plan(
 
     plan = StudyPlan(
         user_id=user_id,
+        position_id=position_id,
         title=title,
         target_position=target_position,
         days=days,

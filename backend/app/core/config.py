@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI 模拟面试官与职业规划系统"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
+    LOG_LEVEL: str = "INFO"  # DEBUG / INFO / WARNING / ERROR
 
     # 数据库
     DATABASE_URL: str = "sqlite:///./app.db"

@@ -126,6 +126,19 @@
               <el-form-item label="面试轮数">
                 <el-slider v-model="maxRounds" :min="3" :max="12" :marks="{ 3: '3', 6: '6', 9: '9', 12: '12' }" />
               </el-form-item>
+              <el-form-item label="回答方式">
+                <el-radio-group v-model="answerMode" class="mode-group">
+                  <el-radio-button
+                    v-for="m in answerModes"
+                    :key="m.value"
+                    :value="m.value"
+                    :disabled="m.value !== 'text' && !micSupported"
+                  >
+                    {{ m.label }}
+                  </el-radio-button>
+                </el-radio-group>
+                <div class="mode-hint">{{ answerModeHint }}</div>
+              </el-form-item>
             </el-form>
 
             <div class="start-summary">
@@ -197,26 +210,57 @@
           >
             <el-icon :size="16"><Bell v-if="voiceEnabled" /><BellFilled v-else /></el-icon>
           </button>
-          <el-button size="small" @click="endEarly">结束面试</el-button>
+          <button
+            v-if="answerMode === 'video'"
+            class="tool-btn"
+            :class="{ on: camEnabled }"
+            :title="camEnabled ? '关闭摄像头' : '开启摄像头'"
+            @click="toggleCamera"
+          >
+            <el-icon :size="16"><VideoCamera /></el-icon>
+          </button>
+          <el-button size="small" :loading="ending" @click="endEarly">结束面试</el-button>
         </div>
       </div>
 
-      <div ref="chatBody" class="chat-body">
-        <template v-for="(m, i) in chatMessages" :key="i">
-          <div v-if="m.role === 'ai'" class="msg ai">
-            <div class="msg-avatar ai-avatar">{{ interviewerLabel.slice(0, 1) }}</div>
-            <div class="msg-bubble ai-bubble">{{ m.content }}</div>
+      <div class="chat-main">
+        <div ref="chatBody" class="chat-body">
+          <div v-if="connError" class="conn-banner">
+            <el-icon :size="14"><Warning /></el-icon>
+            <span class="conn-text">{{ connError }}</span>
+            <button v-if="connAction" class="conn-retry" @click="connAction()">重试</button>
           </div>
-          <div v-else class="msg user">
-            <div class="msg-bubble user-bubble">{{ m.content }}</div>
-          </div>
-        </template>
-        <div v-if="chatLoading" class="msg ai">
-          <div class="msg-avatar ai-avatar">AI</div>
-          <div class="msg-bubble ai-bubble thinking">
-            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+          <template v-for="(m, i) in chatMessages" :key="i">
+            <div v-if="m.role === 'ai'" class="msg ai" :class="{ typing: m.typing }" @click="m.typing && skipTyping(m)">
+              <div class="msg-avatar ai-avatar">{{ interviewerLabel.slice(0, 1) }}</div>
+              <div class="msg-bubble ai-bubble">
+                {{ m.shown }}<span v-if="m.typing" class="typing-caret"></span>
+              </div>
+            </div>
+            <div v-else class="msg user">
+              <div class="msg-bubble user-bubble">{{ m.content }}</div>
+            </div>
+          </template>
+          <div v-if="chatLoading" class="msg ai">
+            <div class="msg-avatar ai-avatar">AI</div>
+            <div class="msg-bubble ai-bubble thinking">
+              <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+            </div>
           </div>
         </div>
+
+        <!-- 视频模式：右侧摄像头栏（含画面活动监测） -->
+        <aside v-if="answerMode === 'video'" class="cam-panel">
+          <div class="cam-title"><span class="cam-dot"></span>我的画面</div>
+          <video v-show="camEnabled" ref="videoRef" autoplay muted playsinline></video>
+          <div v-if="!camEnabled" class="cam-empty">
+            <el-icon :size="18"><VideoCamera /></el-icon>
+            <span>{{ camError || '摄像头未开启' }}</span>
+          </div>
+          <div v-else class="cam-status" :class="{ idle: !camActive }">
+            {{ camActive ? '画面正常' : '画面静止，请靠近摄像头' }}
+          </div>
+        </aside>
       </div>
 
       <div class="chat-input">
@@ -237,7 +281,8 @@
           :disabled="!waitingAnswer"
           :placeholder="recording ? '正在聆听你的回答…' : (waitingAnswer ? '输入你的回答，Enter 发送，Shift+Enter 换行' : '面试官正在提问…')"
           resize="none"
-          @keydown.enter.exact.prevent="sendAnswer"
+          @input="onDraftTyped"
+          @keydown="onAnswerKeydown"
         />
         <button class="send-btn" :disabled="!waitingAnswer || !answerDraft.trim()" @click="sendAnswer">
           <el-icon :size="18"><Promotion /></el-icon>
@@ -249,7 +294,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import WizardStepper from '@/components/wizard/WizardStepper.vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -264,13 +309,31 @@ import {
   Microphone,
   Promotion,
   User,
+  VideoCamera,
 } from '@element-plus/icons-vue'
 import { listResumes } from '@/api/diagnostic'
 import { listPositions } from '@/api/question'
 import { listInterviewers } from '@/api/interviewer'
-import { answerInterview, createInterview, finishInterview, startInterview } from '@/api/interview'
+import {
+  answerInterview,
+  createInterview,
+  finishInterview,
+  getInterviewDetail,
+  startInterview,
+} from '@/api/interview'
+import {
+  TYPEWRITER_TICK_MS,
+  createAiMessage,
+  mapHistoryMessage,
+  typewriterStep,
+  typingTick,
+} from '@/utils/typewriter'
 
 const route = useRoute()
+const router = useRouter()
+
+// 结束面试请求进行中（防重复点击）
+const ending = ref(false)
 
 // ── 向导状态 ──
 const wizardSteps = [
@@ -309,6 +372,18 @@ const answerDraft = ref('')
 const interviewId = ref(null)
 const chatBody = ref(null)
 
+// 断线提示：connError 显示横幅，connAction 为“重试”回调
+const connError = ref('')
+const connAction = ref(null)
+
+// 打字机定时器集合（onUnmounted 时统一清理）
+let typeTimers = []
+
+// SSE 流控制：切换页面时中断所有进行中的流，
+// 避免后台回调在组件卸载后继续创建定时器 / 语音播报，造成内存泄漏
+let sseController = null
+let isUnmounted = false
+
 // ── 语音面试（Web Speech API）──
 const voiceEnabled = ref(true)
 const micSupported = typeof window !== 'undefined' && (
@@ -317,6 +392,115 @@ const micSupported = typeof window !== 'undefined' && (
 const recording = ref(false)
 let finalTranscript = ''
 let recognition = null
+
+// ── 回答方式（T7 视频面试降级方案）──
+const answerModes = [
+  { value: 'text', label: '文字', desc: '纯文字输入，适用所有浏览器' },
+  { value: 'voice', label: '语音', desc: '语音输入自动转文字，回答更自然' },
+  { value: 'video', label: '视频', desc: '摄像头 + 语音输入，画面活动监测（实验性）' },
+]
+const answerMode = ref(micSupported ? 'voice' : 'text')
+const answerModeHint = computed(
+  () => answerModes.find((m) => m.value === answerMode.value)?.desc || '',
+)
+
+// ── 摄像头（视频模式）──
+const camEnabled = ref(false)   // 视频轨道是否已开启
+const camError = ref('')        // 摄像头失败原因
+const camActive = ref(true)     // 画面活动检测结果（默认视为正常）
+const videoRef = ref(null)
+let camStream = null
+let camTracks = []
+let activityTimer = null
+let lastFrame = null
+
+// 每 4s 截一帧到小 canvas，与上一帧比较像素差 → 画面是否有人活动（轻量方案，无需 face-api）
+function startActivityCheck() {
+  if (activityTimer) return
+  lastFrame = null
+  camActive.value = true
+  activityTimer = setInterval(() => {
+    const v = videoRef.value
+    if (!v || v.readyState < 2) return
+    const canvas = document.createElement('canvas')
+    canvas.width = 96
+    canvas.height = 72
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(v, 0, 0, 96, 72)
+    let data
+    try {
+      data = ctx.getImageData(0, 0, 96, 72).data
+    } catch {
+      return
+    }
+    if (lastFrame) {
+      let diff = 0
+      for (let i = 0; i < data.length; i += 32) {
+        diff += Math.abs(data[i] - lastFrame[i])
+      }
+      camActive.value = diff > 700
+    }
+    lastFrame = data
+  }, 4000)
+}
+
+function stopCamera() {
+  if (activityTimer) {
+    clearInterval(activityTimer)
+    activityTimer = null
+  }
+  lastFrame = null
+  camActive.value = true
+  camTracks.forEach((t) => {
+    try { t.stop() } catch { /* 忽略 */ }
+  })
+  camTracks = []
+  if (videoRef.value) videoRef.value.srcObject = null
+  camStream = null
+  camEnabled.value = false
+}
+
+async function enableCamera() {
+  if (camStream) return
+  if (!navigator.mediaDevices?.getUserMedia) {
+    camError.value = '当前浏览器不支持摄像头'
+    fallbackVideoMode()
+    return
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480 },
+      audio: false,
+    })
+    camStream = stream
+    camTracks = stream.getVideoTracks()
+    camEnabled.value = true
+    camError.value = ''
+    await nextTick()
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream
+      videoRef.value.play().catch(() => {})
+    }
+    startActivityCheck()
+  } catch {
+    camError.value = '摄像头不可用或未授权'
+    fallbackVideoMode()
+  }
+}
+
+// 视频模式降级：摄像头失败 → 语音（语音不可用 → 文字），不阻塞面试主流程
+function fallbackVideoMode() {
+  stopCamera()
+  const next = micSupported ? 'voice' : 'text'
+  answerMode.value = next
+  ElMessage.warning(`${camError.value}，已切换为${next === 'voice' ? '语音' : '文字'}回答`)
+}
+
+function toggleCamera() {
+  if (camStream) stopCamera()
+  else enableCamera()
+}
 
 // ── 派生 ──
 const positionLabel = computed(() => {
@@ -338,6 +522,8 @@ const canNext = computed(() => {
 })
 
 const interviewerLabel = computed(() => {
+  // 会话恢复模式：优先使用后端返回的面试官名称
+  if (session.value?.interviewer_name) return session.value.interviewer_name
   const iv = interviewers.value.find((x) => x.id === selectedInterviewerId.value)
   return iv ? iv.name : ''
 })
@@ -348,6 +534,9 @@ const difficultyLabel = computed(() => {
 })
 
 const sessionPositionLabel = computed(() => {
+  // 会话恢复模式：优先使用后端返回的岗位信息（可能是自定义岗位，不在 preset 列表中）
+  if (session.value?.position_name) return session.value.position_name
+  if (session.value?.target_position) return session.value.target_position
   const p = positions.value.find((x) => x.id === selectedPositionId.value)
   return p ? positionOptionLabel(p) : (customPosition.value.trim() || '模拟面试')
 })
@@ -398,7 +587,7 @@ async function createSession() {
   creating.value = true
   try {
     const payload = {
-      mode: 'text',
+      mode: answerMode.value,
       interview_type: 'normal',
       max_rounds: maxRounds.value,
       difficulty: selectedDifficulty.value,
@@ -413,6 +602,10 @@ async function createSession() {
     interviewId.value = s.id
     chatMessages.value = []
     await beginChat()
+    // 视频模式：会话就绪后开启摄像头（失败自动回退语音/文字）
+    if (answerMode.value === 'video') {
+      await enableCamera()
+    }
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || e.message || '创建面试失败')
   } finally {
@@ -422,26 +615,78 @@ async function createSession() {
 
 async function beginChat() {
   chatLoading.value = true
-  waitingAnswer.value = true
+  waitingAnswer.value = false
+  connError.value = ''
+  connAction.value = null
+  if (sseController) sseController.abort()
+  sseController = new AbortController()
   try {
     await startInterview(interviewId.value, {
+      signal: sseController.signal,
       onEvent: (event, data) => {
+        if (isUnmounted) return
         if (event === 'question') {
-          chatMessages.value.push({ role: 'ai', content: data?.question })
-          speakText(data?.question)
+          pushAiMessage(data?.question)
         } else if (event === 'finished') {
           waitingAnswer.value = false
         }
       },
     })
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '面试启动失败')
-    await finishInterview(interviewId.value)
-    session.value = null
-    return
+    // 组件已卸载或主动中断时不提示，避免误报断线
+    if (isUnmounted || e?.name === 'AbortError') return
+    // 保留会话，提示断线并允许重试（startInterview 幂等，可安全重发）
+    connError.value = e.response?.data?.detail || e.message || '网络连接中断，面试尚未开始'
+    connAction.value = () => {
+      beginChat()
+    }
+    ElMessage.error(connError.value)
   } finally {
     chatLoading.value = false
   }
+  scrollToBottom()
+}
+
+// ── 打字机效果：question 逐字展示，点击气泡可跳过 ──
+function pushAiMessage(content) {
+  if (!content) return
+  // push 后从响应式数组中取回 proxy 引用，否则修改 msg.shown 不会触发视图更新
+  chatMessages.value.push(createAiMessage(content))
+  const msg = chatMessages.value[chatMessages.value.length - 1]
+  speakText(content)
+  // 约 2.5 秒打完整段（步长按文本长度自适应）
+  const step = typewriterStep(content.length)
+  let pos = 0
+  const timer = setInterval(() => {
+    const tick = typingTick(pos, step, content.length)
+    pos = tick.pos
+    msg.shown = content.slice(0, pos)
+    scrollToBottom()
+    if (tick.done) {
+      clearInterval(timer)
+      msg._timer = null
+      msg.typing = false
+      msg.shown = content
+      waitingAnswer.value = true
+      // 语音/视频模式：问题已完整显示，自动开麦让用户直接回答
+      maybeAutoStartMic()
+    }
+  }, TYPEWRITER_TICK_MS)
+  msg._timer = timer
+  typeTimers.push(timer)
+  scrollToBottom()
+  return msg
+}
+
+function skipTyping(msg) {
+  if (msg._timer) {
+    clearInterval(msg._timer)
+    msg._timer = null
+  }
+  msg.typing = false
+  msg.shown = msg.full
+  waitingAnswer.value = true
+  maybeAutoStartMic()
   scrollToBottom()
 }
 
@@ -453,6 +698,9 @@ function speakText(text) {
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'zh-CN'
   u.rate = 1.05
+  // 播报自然结束（未被提前停止）时也自动开麦
+  u.onend = () => { maybeAutoStartMic() }
+  u.onerror = () => { maybeAutoStartMic() }
   window.speechSynthesis.speak(u)
 }
 
@@ -475,6 +723,8 @@ function getRecognition() {
   r.continuous = true
   r.interimResults = true
   r.onresult = (e) => {
+    // 识别已停止（如用户已按 Enter 发送）后不再覆盖输入框，避免 stop() 的收尾结果清空内容
+    if (!recording.value) return
     let interim = ''
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const res = e.results[i]
@@ -483,7 +733,12 @@ function getRecognition() {
     }
     answerDraft.value = (finalTranscript + interim).trimStart()
   }
-  r.onerror = () => {
+  r.onerror = (e) => {
+    // 自动开麦后用户可能尚未开口：no-speech 属正常，保持录音并重启识别
+    if (e?.error === 'no-speech' && recording.value && waitingAnswer.value) {
+      try { r.start() } catch { recording.value = false }
+      return
+    }
     recording.value = false
   }
   r.onend = () => {
@@ -503,51 +758,106 @@ function stopRecording() {
   }
 }
 
+function startRecording() {
+  if (!micSupported) return false
+  const r = getRecognition()
+  if (!r) return false
+  if (recording.value) return true
+  finalTranscript = ''
+  answerDraft.value = ''
+  recording.value = true
+  try {
+    r.start()
+    return true
+  } catch {
+    recording.value = false
+    return false
+  }
+}
+
 function toggleRecording() {
   if (!micSupported || !waitingAnswer.value) return
-  const r = getRecognition()
-  if (!r) {
-    ElMessage.warning('当前浏览器不支持语音输入，请使用 Chrome / Edge')
-    return
-  }
   if (recording.value) {
     stopRecording()
-  } else {
-    finalTranscript = ''
-    answerDraft.value = ''
-    recording.value = true
-    try { r.start() } catch {
-      recording.value = false
-      ElMessage.warning('无法启动麦克风，请检查浏览器权限')
-    }
+    return
+  }
+  if (!startRecording()) {
+    ElMessage.warning('无法启动麦克风，请检查浏览器权限')
+  }
+}
+
+// AI 回答后自动开麦（语音/视频模式）：问题已完整显示在屏幕上，直接开麦让用户开口回答。
+// 若 AI 语音播报还在进行，先停止播报，避免其声音被识别进用户回答；
+// 不再等待播报结束（之前按播报时长等待导致麦克风迟迟不打开）。
+function maybeAutoStartMic() {
+  if (isUnmounted) return
+  if (!micSupported || !waitingAnswer.value) return
+  if (answerMode.value === 'text') return
+  if (recording.value) return
+  if ('speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+    stopSpeak()
+  }
+  startRecording()
+}
+
+// 用户手动编辑输入框时停止语音识别，避免识别结果覆盖手打内容
+function onDraftTyped() {
+  if (recording.value) stopRecording()
+}
+
+// Enter 发送：过滤中文输入法组词确认的 Enter，避免误发/发空
+function onAnswerKeydown(e) {
+  if (e.isComposing) return
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault()
+    sendAnswer()
   }
 }
 
 async function sendAnswer() {
-  stopRecording()
+  // 先取内容再停识别：stop() 的收尾 onresult 会覆盖输入框，顺序反了会发空内容
   const content = answerDraft.value.trim()
   if (!content || !waitingAnswer.value) return
+  stopRecording()
   chatMessages.value.push({ role: 'user', content })
   answerDraft.value = ''
   waitingAnswer.value = false
   chatLoading.value = true
+  connError.value = ''
+  connAction.value = null
   scrollToBottom()
+  if (sseController) sseController.abort()
+  sseController = new AbortController()
   try {
     await answerInterview(interviewId.value, content, {
+      signal: sseController.signal,
       onEvent: (event, data) => {
+        if (isUnmounted) return
         if (event === 'question') {
-          chatMessages.value.push({ role: 'ai', content: data?.question })
-          speakText(data?.question)
-          waitingAnswer.value = true
-        } else if (event === 'finished') {
+          pushAiMessage(data?.question)
+        } else         if (event === 'finished') {
           const detail = data || {}
-          ElMessage.success(detail.analysis ? '面试完成，报告已生成' : '面试结束')
+          ElMessage.success(detail.message || '面试结束，报告正在生成')
           waitingAnswer.value = false
         }
       },
     })
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '提交失败')
+    // 组件已卸载或主动中断时不提示，避免误报断线
+    if (isUnmounted || e?.name === 'AbortError') return
+    // 移除未成功送达的回答（服务端未记录），恢复输入内容，由用户决定是否重发
+    const last = chatMessages.value[chatMessages.value.length - 1]
+    if (last && last.role === 'user' && last.content === content) {
+      chatMessages.value.pop()
+    }
+    answerDraft.value = content
+    connError.value = e.response?.data?.detail || e.message || '网络连接中断，回答可能未送达'
+    connAction.value = () => {
+      connError.value = ''
+      connAction.value = null
+      waitingAnswer.value = true
+    }
+    ElMessage.error(connError.value)
   } finally {
     chatLoading.value = false
   }
@@ -555,15 +865,20 @@ async function sendAnswer() {
 }
 
 async function endEarly() {
+  if (ending.value) return
+  stopCamera()
   if (chatMessages.value.length === 0) {
     session.value = null
     return
   }
+  ending.value = true
   try {
     await finishInterview(interviewId.value)
-    ElMessage.success('面试已结束，报告已生成')
+    ElMessage.success('面试已结束，报告正在生成')
   } catch {
     ElMessage.warning('面试已结束')
+  } finally {
+    ending.value = false
   }
   session.value = null
 }
@@ -591,10 +906,19 @@ function applyQueryParams() {
 watch(currentStep, scrollToBottom)
 
 onUnmounted(() => {
+  // 先标记卸载并中断 SSE 流，阻断后续回调创建新的定时器 / 语音播报
+  isUnmounted = true
+  if (sseController) {
+    sseController.abort()
+    sseController = null
+  }
   stopSpeak()
+  for (const t of typeTimers) clearInterval(t)
+  typeTimers = []
   if (recognition) {
     try { recognition.abort() } catch { /* 忽略 */ }
   }
+  stopCamera()
 })
 
 onMounted(async () => {
@@ -610,8 +934,54 @@ onMounted(async () => {
       selectedInterviewerId.value = interviewers.value[0].id
     }
   } catch { /* 忽略 */ }
-  applyQueryParams()
+  // 会话中断恢复：从历史记录“继续面试”进入
+  const rid = Number(route.query.interview_id)
+  if (rid) {
+    await resumeInterview(rid)
+  } else {
+    applyQueryParams()
+  }
 })
+
+// ── 会话恢复：加载进行中的面试并重建聊天上下文 ──
+async function resumeInterview(id) {
+  try {
+    const d = await getInterviewDetail(id)
+    if (d.status === 'reported') {
+      ElMessage.info('该面试已结束')
+      if (d.report_id) {
+        router.replace({ name: 'report', params: { id: d.report_id } })
+      }
+      return
+    }
+    if (!['created', 'asking', 'decide_next'].includes(d.status)) {
+      ElMessage.info('该面试当前不可继续')
+      return
+    }
+    session.value = d
+    interviewId.value = d.id
+    chatMessages.value = (d.messages || []).map(mapHistoryMessage)
+    selectedPositionId.value = d.position_id
+    customPosition.value = d.target_position || ''
+    selectedDifficulty.value = d.difficulty || 'normal'
+    maxRounds.value = d.max_rounds || 6
+    selectedInterviewerId.value = d.interviewer_id
+    waitingAnswer.value = true
+    scrollToBottom()
+    // 会话恢复：还原回答方式
+    if (['text', 'voice', 'video'].includes(d.mode)) {
+      answerMode.value = d.mode
+    }
+    // 会话恢复：原会话为视频模式且浏览器支持语音 → 恢复摄像头
+    if (d.mode === 'video' && micSupported) {
+      nextTick(() => enableCamera())
+    }
+    // 语音/视频模式：恢复后自动开麦，直接开口即可
+    maybeAutoStartMic()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || e.message || '恢复面试失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -931,6 +1301,7 @@ onMounted(async () => {
 
 /* ── 对话区 ── */
 .chat-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 132px);
@@ -940,6 +1311,11 @@ onMounted(async () => {
   border: 1px solid rgba(226, 232, 240, 0.8);
   box-shadow: var(--app-shadow-md, 0 4px 16px rgba(20, 20, 20, 0.08));
   overflow: hidden;
+}
+.chat-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
 .chat-head {
   display: flex;
@@ -1010,6 +1386,7 @@ onMounted(async () => {
 .chat-dot { color: var(--app-border-strong); }
 .chat-body {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 20px;
   display: flex;
@@ -1078,6 +1455,67 @@ onMounted(async () => {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
   30% { transform: translateY(-4px); opacity: 1; }
 }
+
+/* 打字机光标 */
+.typing-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--app-cyan, #5ad0e6);
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+@keyframes caret-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+.msg.ai.typing {
+  cursor: pointer;
+  position: relative;
+}
+.msg.ai.typing:hover::after {
+  content: '点击跳过';
+  position: absolute;
+  top: -8px;
+  left: 44px;
+  font-size: 11px;
+  color: var(--app-text-muted);
+  background: rgba(0, 0, 0, 0.6);
+  padding: 2px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+/* 断线横幅 */
+.conn-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgba(242, 193, 78, 0.12);
+  border: 1px solid rgba(242, 193, 78, 0.4);
+  color: var(--app-amber, #d97706);
+  font-size: 13px;
+}
+.conn-text {
+  flex: 1;
+}
+.conn-retry {
+  border: none;
+  background: rgba(242, 193, 78, 0.2);
+  color: var(--app-amber, #d97706);
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.conn-retry:hover {
+  background: rgba(242, 193, 78, 0.35);
+}
 .chat-input {
   display: flex;
   gap: 10px;
@@ -1104,6 +1542,74 @@ onMounted(async () => {
 .send-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* 视频模式：右侧摄像头栏 */
+.cam-panel {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #000;
+  border-left: 1px solid rgba(226, 232, 240, 0.8);
+}
+.cam-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.92);
+}
+.cam-panel video {
+  flex: 1;
+  min-height: 0;
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* 镜像，符合视频会议习惯 */
+}
+.cam-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  background: #f8fafc;
+}
+.cam-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(16, 185, 129, 0.85);
+}
+.cam-status.idle { background: rgba(242, 193, 78, 0.9); color: #5b3a00; }
+.cam-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: cam-blink 1.4s ease-in-out infinite;
+}
+@keyframes cam-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.mode-group { margin-bottom: 4px; }
+.mode-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--app-text-muted);
 }
 
 /* ==================== 深色液态玻璃覆盖 ==================== */
@@ -1252,5 +1758,19 @@ onMounted(async () => {
 .send-btn {
   background: var(--app-brand-gradient);
   color: #071018;
+}
+.cam-panel {
+  border-left: 1px solid var(--app-border);
+  background: rgba(5, 7, 14, 0.55);
+  box-shadow: var(--glass-highlight), var(--app-shadow-md);
+}
+.cam-title { color: var(--app-text); }
+.cam-empty { background: rgba(5, 7, 14, 0.28); }
+.cam-status { background: rgba(67, 217, 163, 0.4); color: #eafff6; }
+.cam-status.idle { background: rgba(242, 193, 78, 0.35); color: #ffe9b3; }
+
+/* 窄屏：视频栏收窄，避免挤压聊天区 */
+@media (max-width: 680px) {
+  .cam-panel { width: 168px; }
 }
 </style>

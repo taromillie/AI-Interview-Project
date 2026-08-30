@@ -35,6 +35,14 @@
               <div class="score">{{ Math.round(it.overall_score) }}</div>
               <div class="score-label">分</div>
             </div>
+            <el-button
+              v-if="['created', 'asking', 'decide_next'].includes(it.status)"
+              size="small"
+              type="primary"
+              @click.stop="goContinue(it)"
+            >
+              继续面试
+            </el-button>
             <el-button size="small" type="primary" plain @click.stop="openDetail(it)">查看</el-button>
             <el-button v-if="it.report_id" size="small" @click.stop="goReport(it.report_id)">复盘报告</el-button>
           </div>
@@ -223,6 +231,11 @@ async function openDetail(it) {
 function goReport(reportId) {
   drawer.value = false
   router.push({ name: 'report', params: { id: reportId } })
+}
+
+// 继续进行中的面试（中断恢复）
+function goContinue(it) {
+  router.push({ name: 'interview', query: { interview_id: it.id } })
 }
 
 onMounted(load)

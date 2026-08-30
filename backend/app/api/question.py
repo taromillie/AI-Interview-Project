@@ -1,5 +1,8 @@
 """题库管理接口（知识原子 CRUD，ADMIN 发布）。"""
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import String, and_, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -121,13 +124,21 @@ def list_atoms(
     position_id: int | None = None,
     status: str | None = Query(default=None, pattern="^(draft|published|archived)$"),
     keyword: str | None = None,
+    tag: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """题库列表：管理员可见全部；普通用户仅可见已发布公共题 + 本人草稿。"""
+    """题库列表：管理员可见全部；普通用户仅可见已发布公共题 + 本人草稿。
+
+    tag 参数按标签精确匹配（JSON 数组包含）。
+    """
     stmt = select(KnowledgeAtom)
     if position_id:
         stmt = stmt.where(KnowledgeAtom.position_id == position_id)
+    if tag:
+        tag_value = tag.strip()
+        if tag_value:
+            stmt = stmt.where(func.cast(KnowledgeAtom.tags, String).like(f'%"{tag_value}"%'))
     if keyword:
         kw = f"%{keyword.strip()}%"
         stmt = stmt.where(
@@ -165,6 +176,37 @@ def list_positions(user: User = Depends(get_current_user), db: Session = Depends
     """岗位列表：内置岗位库为空时自动初始化。"""
     _seed_builtin_positions(db)
     return db.scalars(select(Position).where(Position.status == "active").order_by(Position.id)).all()
+
+
+class ImportRequest(BaseModel):
+    position_id: int
+    format: str = "auto"  # auto / json / markdown
+    text: str
+
+
+@router.post("/import", status_code=201)
+def import_atoms_api(
+    payload: ImportRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """批量导入题目（JSON / Markdown，自动识别或显式指定）。
+
+    结果：created 新建条数；skipped 同岗位重复跳过；errors 逐行错误明细。
+    """
+    from app.services.question_import import import_atoms, parse_auto, parse_json, parse_markdown
+
+    try:
+        if payload.format == "json":
+            items = parse_json(payload.text)
+        elif payload.format == "markdown":
+            items = parse_markdown(payload.text)
+        else:
+            items = parse_auto(payload.text)
+        result = import_atoms(db, user, payload.position_id, items)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=f"解析失败：{exc}")
+    return result
 
 
 @router.post("/positions/sync")

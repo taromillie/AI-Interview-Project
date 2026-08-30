@@ -1,9 +1,18 @@
 <template>
-  <router-view />
+  <el-config-provider :locale="zhCn">
+    <router-view />
+  </el-config-provider>
 </template>
 
+<script setup>
+// 全局中文语言包（Element Plus 按需引入后由 ConfigProvider 接管 locale）
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+</script>
+
 <style>
-:root {
+/* 注意：Element Plus 按需引入的 base.css 含 :root 亮色变量（--el-fill-color-blank:#fff 等），
+   路由懒加载时会在运行时后注入并覆盖 :root。用 html:root 提高特异性，保证主题变量始终生效 */
+html:root {
   /* ===== Element Plus 主题色：青蓝液态玻璃 ===== */
   --el-color-primary: #5ad0e6;
   --el-color-primary-light-3: #7fdcec;
@@ -202,8 +211,8 @@ body {
 
 /* ==================== Element Plus 深色玻璃细节 ==================== */
 
-/* 卡片：玻璃 */
-.el-card {
+/* 卡片：玻璃（html 前缀提高特异性，防止被按需注入的组件样式覆盖） */
+html .el-card {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -213,7 +222,7 @@ body {
   color: var(--app-text);
   transition: border-color 0.25s ease, transform 0.25s var(--ease-out), box-shadow 0.25s ease;
 }
-.el-card__header {
+html .el-card__header {
   border-bottom: 1px solid var(--app-border);
   font-weight: 600;
   color: var(--app-text);
@@ -223,7 +232,7 @@ body {
   justify-content: space-between;
   gap: 8px;
 }
-.el-card__body {
+html .el-card__body {
   color: var(--app-text-secondary);
 }
 
@@ -262,28 +271,28 @@ body {
   box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset, 0 16px 38px -10px rgba(107, 139, 255, 0.7);
 }
 
-/* 表单输入玻璃化 */
-.el-input__wrapper,
-.el-textarea__inner,
-.el-select__wrapper {
+/* 表单输入玻璃化（html 前缀提高特异性，防止被按需注入的组件默认样式覆盖） */
+html .el-input__wrapper,
+html .el-textarea__inner,
+html .el-select__wrapper {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
 }
-.el-input__wrapper:hover,
-.el-select__wrapper:hover {
+html .el-input__wrapper:hover,
+html .el-select__wrapper:hover {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22) inset;
 }
-.el-input__wrapper.is-focus,
-.el-textarea__inner:focus,
-.el-select__wrapper.is-focused {
+html .el-input__wrapper.is-focus,
+html .el-textarea__inner:focus,
+html .el-select__wrapper.is-focused {
   box-shadow: 0 0 0 1px rgba(90, 208, 230, 0.6) inset, 0 0 0 4px rgba(90, 208, 230, 0.14) !important;
 }
-.el-input__inner,
-.el-textarea__inner {
+html .el-input__inner,
+html .el-textarea__inner {
   color: var(--app-text);
 }
-.el-textarea__inner {
+html .el-textarea__inner {
   font-family: var(--app-font);
   background: rgba(255, 255, 255, 0.05);
 }
@@ -398,7 +407,7 @@ body {
 }
 
 /* 表格深色玻璃 */
-.el-table {
+html .el-table {
   --el-table-header-bg-color: rgba(255, 255, 255, 0.05);
   --el-table-header-text-color: var(--app-text-secondary);
   --el-table-border-color: rgba(255, 255, 255, 0.08);
@@ -409,20 +418,20 @@ body {
   background: transparent;
   border-radius: 12px;
 }
-.el-table th.el-table__cell {
+html .el-table th.el-table__cell {
   font-weight: 600;
 }
-.el-table,
-.el-table__inner-wrapper::before,
-.el-table--border::after {
+html .el-table,
+html .el-table__inner-wrapper::before,
+html .el-table--border::after {
   background-color: transparent;
 }
 
 /* 分隔线 */
-.el-divider {
+html .el-divider {
   border-color: rgba(255, 255, 255, 0.12);
 }
-.el-divider__text {
+html .el-divider__text {
   font-weight: 600;
   font-size: 13px;
   color: var(--app-text);
@@ -430,7 +439,7 @@ body {
 }
 
 /* Timeline */
-.el-timeline-item__tail {
+html .el-timeline-item__tail {
   border-left: 2px solid rgba(255, 255, 255, 0.12);
 }
 .el-timeline-item__node {
@@ -456,14 +465,14 @@ body {
 }
 
 /* 标签 Tag 默认玻璃 */
-.el-tag {
+html .el-tag {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.14);
   color: var(--app-text-secondary);
 }
 
 /* 进度条轨道 */
-.el-progress-bar__outer {
+html .el-progress-bar__outer {
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -474,20 +483,20 @@ body {
 }
 
 /* 描述列表 */
-.el-descriptions {
+html .el-descriptions {
   --el-descriptions-item-bordered-label-background: rgba(255, 255, 255, 0.05);
   background: transparent;
   color: var(--app-text-secondary);
 }
-.el-descriptions__body {
+html .el-descriptions__body {
   background: transparent;
   color: var(--app-text-secondary);
 }
 
 /* 折叠面板 */
-.el-collapse,
-.el-collapse-item__header,
-.el-collapse-item__wrap {
+html .el-collapse,
+html .el-collapse-item__header,
+html .el-collapse-item__wrap {
   background: transparent;
   border-color: rgba(255, 255, 255, 0.1);
   color: var(--app-text);
@@ -499,7 +508,7 @@ body {
 }
 
 /* 骨架屏 */
-.el-skeleton__item {
+html .el-skeleton__item {
   background: rgba(255, 255, 255, 0.06);
 }
 

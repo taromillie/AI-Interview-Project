@@ -39,7 +39,7 @@ async def create_study_plan(
     llm = require_llm(db, user)
     plan = await generate_study_plan(
         db, llm, user_id=user.id, target_position=payload.target_position,
-        days=payload.days, resume=resume,
+        days=payload.days, resume=resume, position_id=payload.position_id,
     )
     return plan
 

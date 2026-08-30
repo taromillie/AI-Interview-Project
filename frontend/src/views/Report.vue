@@ -54,7 +54,14 @@
 
         <!-- 总评 -->
         <el-divider content-position="left">总评与建议</el-divider>
-        <el-alert :title="report.summary || '暂无总评'" type="info" :closable="false" />
+        <el-alert
+          v-if="isGenerating"
+          title="报告正在后台生成，页面将自动刷新，请稍候…"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+        <el-alert v-else :title="report.summary || '暂无总评'" type="info" :closable="false" />
 
         <!-- 弱点 -->
         <template v-if="report.weak_points?.length">
@@ -159,7 +166,7 @@
 
 <script setup>
 import { DataAnalysis, Plus, Pointer } from '@element-plus/icons-vue'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getReport } from '@/api/report'
 
@@ -168,8 +175,14 @@ const router = useRouter()
 
 const DIMS = { tech: '技术能力', expression: '表达沟通', logic: '逻辑思维', project: '项目经验' }
 
+// 与后端 REPORT_PENDING_SUMMARY 保持一致：总评为此值表示报告仍在后台生成
+const PENDING_SUMMARY = '报告生成中，请稍后刷新查看…'
+
 const loading = ref(false)
 const report = ref(null)
+let pollTimer = null
+
+const isGenerating = computed(() => report.value?.summary === PENDING_SUMMARY)
 
 function goPractice(knowledge) {
   router.push({ path: '/question-bank', query: { keyword: knowledge } })
@@ -190,6 +203,10 @@ async function load() {
   loading.value = true
   try {
     report.value = await getReport(id)
+    // 报告仍在后台生成：轮询直到完成
+    if (report.value?.summary === PENDING_SUMMARY) {
+      startPolling(id)
+    }
   } catch {
     report.value = null
   } finally {
@@ -197,7 +214,30 @@ async function load() {
   }
 }
 
+function startPolling(id) {
+  if (pollTimer) return
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await getReport(id)
+      if (r?.summary !== PENDING_SUMMARY) {
+        report.value = r
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
+    } catch {
+      // 瞬时网络错误忽略，继续轮询
+    }
+  }, 2500)
+}
+
 onMounted(load)
+
+onUnmounted(() => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+})
 </script>
 
 <style scoped>

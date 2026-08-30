@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     build:
@@ -9,10 +7,31 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # 数据持久化：SQLite 与向量库统一存到挂载卷
       - DATABASE_URL=sqlite:////app/data/app.db
       - VECTOR_DB_PATH=/app/data/chroma
+      # 安全与业务配置从根目录 .env 透传（未配置用默认值）
+      - JWT_SECRET=${JWT_SECRET:-please-change-this-secret}
+      - AES_KEY=${AES_KEY:-please-change-this-aes-key-32bytes!}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # 岗位采集
+      - JOB_SOURCE_ENABLED=${JOB_SOURCE_ENABLED:-jobui}
+      - JOB_SYNC_ON_STARTUP=${JOB_SYNC_ON_STARTUP:-true}
+      - JOB_SYNC_INTERVAL_HOURS=${JOB_SYNC_INTERVAL_HOURS:-0.5}
+      # 向量检索（可选）
+      - EMBEDDING_ENABLED=${EMBEDDING_ENABLED:-false}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
     volumes:
       - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
@@ -23,7 +42,8 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

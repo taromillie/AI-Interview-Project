@@ -311,7 +311,7 @@ async function saveOffer() {
 
 async function removeOffer(o) {
   try {
-    await ElMessageBox.confirm(`确定删除 ${o.company} 的 Offer？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(`确定删除 ${o.company} 的 Offer？`, '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
   } catch {
     return
   }

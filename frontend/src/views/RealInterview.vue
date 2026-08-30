@@ -428,7 +428,7 @@ async function runReview() {
 }
 
 async function removeRecord(r) {
-  await ElMessageBox.confirm(`确定删除 ${r.company} 的面试记录？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除 ${r.company} 的面试记录？`, '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
   await deleteRealInterview(r.id)
   if (current.value && current.value.id === r.id) current.value = null
   ElMessage.success('已删除')

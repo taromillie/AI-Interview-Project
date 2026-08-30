@@ -1,5 +1,5 @@
 """面试与复盘契约。"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class InterviewCreateRequest(BaseModel):
@@ -63,3 +63,27 @@ class ReportOut(BaseModel):
     dimensions: dict
     question_feedback: list
     weak_points: list
+    summary: str = ""
+    coverage: dict = {}
+    learning_path: list = []
+
+    # 旧数据迁移后这些列可能为 NULL：统一兜底为默认值，避免 500
+    @field_validator("dimensions", "coverage", mode="before")
+    @classmethod
+    def _dict_or_default(cls, v):
+        return v if v is not None else {}
+
+    @field_validator("question_feedback", "weak_points", "learning_path", mode="before")
+    @classmethod
+    def _list_or_default(cls, v):
+        return v if v is not None else []
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def _summary_or_default(cls, v):
+        return v if v is not None else ""
+
+    @field_validator("overall_score", mode="before")
+    @classmethod
+    def _score_or_default(cls, v):
+        return v if v is not None else 0.0

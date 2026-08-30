@@ -10,10 +10,15 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.responses import JSONResponse
 
+from sqlalchemy import text
+
 from app.core.config import settings
 from app.core.db import SessionLocal, init_db
 from app.core.exceptions import register_exception_handlers
+from app.core.logging_config import setup_logging
 from app.core.rate_limit import limiter
+
+setup_logging(settings.LOG_LEVEL)
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +107,20 @@ app.add_middleware(SlowAPIMiddleware)
 
 @app.get("/health", tags=["system"])
 def health() -> dict:
-    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+    """健康检查：包含数据库连通性探测。"""
+    db_ok = True
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("健康检查：数据库连接异常: %s", exc)
+        db_ok = False
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "database": "ok" if db_ok else "error",
+    }
 
 
 # 路由注册
@@ -112,7 +130,9 @@ from app.api import (  # noqa: E402
     interview,
     interviewer,
     jd,
+    job_track,
     offer,
+    position_match,
     profile,
     provider,
     question,
@@ -138,5 +158,7 @@ for router in (
     study_plan.router,
     real_interview.router,
     offer.router,
+    position_match.router,
+    job_track.router,
 ):
     app.include_router(router, prefix="/api")

@@ -2,14 +2,14 @@
 
 | 项目名称 | AI 模拟面试官与职业规划系统 |
 |---|---|
-| 文档版本 | v1.1 |
-| 创建日期 | 2026-08-27（v1.1 修订于 2026-08-27） |
+| 文档版本 | v1.2 |
+| 创建日期 | 2026-08-27（v1.2 修订于 2026-08-29） |
 | 文档类型 | 架构设计文档 |
 | 关联文档 | [需求文档](requirements.md) v1.1 |
 | 项目定位 | 课程 / 毕业设计项目 |
 | 技术路线 | Python（FastAPI + LangChain + 向量检索） |
 
-> **v1.1 修订说明**：① 新增**前端设计系统**章节（向导式分步布局、极简导航、视觉基线）；② 新增**面试官角色系统**与**难度档位体系**设计（Interviewer 模型 + Prompt 注入 + 编排器集成）；③ 新增**岗位广场**设计（Position 模型扩展 + 岗位广场 API）；④ 数据模型与接口设计同步更新。
+> **v1.2 修订说明**：① 新增**真实面试复盘**设计（RealInterview 模型 + AI 逐题批改，聚合进能力画像）；② 新增**备战计划**设计（StudyPlan 模型 + 画像缺口驱动生成 N 天任务）；③ 新增**岗位爬虫与同步**设计（job_crawler + sync_state，幂等入库 + 失败兜底）；④ 新增**简历→岗位智能匹配**设计（ResumePositionMatch 覆盖式保存）；⑤ 新增 **Offer 对比**设计（加权评分 + AI 建议）；⑥ 目录结构、ER 概要、核心表、API 概览同步更新。历史修订：v1.1（2026-08-27）新增前端设计系统、面试官角色系统、难度档位体系、岗位广场。
 
 ---
 
@@ -31,10 +31,16 @@
 | AD-08 | 支撑**难度档位体系**：创建面试选难度，Agent 行为按档调节 | FR-C-11 / FR-I-04 |
 | AD-09 | 支撑**岗位广场**：岗位卡片网格 → 一键发起岗位导向面试 | GOAL-07 / FR-H-01~03 |
 | AD-10 | 统一**前端设计系统**：向导式分步布局 + 极简导航 + 视觉基线 | GOAL-09 / FR-J-01~04 |
+| AD-11 | 支撑**真实面试复盘**：录入真实面试问答，AI 逐题批改 + 整体复盘，沉淀画像数据 | 面试闭环 / 复盘 |
+| AD-12 | 支撑**备战计划**：由能力画像缺口 + 目标岗位生成 N 天冲刺计划，任务勾选推进 | 学习路线 / 规划 |
+| AD-13 | 支撑**岗位数据爬取与幂等同步**：外部数据源抓取、去重入库、失败兜底内置岗位 | 岗位广场 / 数据增强 |
+| AD-14 | 支撑**简历→岗位智能匹配**：按简历技能从岗位库匹配 Top N，覆盖式保存推荐 | 简历匹配 / 岗位推荐 |
+| AD-15 | 支撑 **Offer 对比**：多 Offer 加权评分 + AI 综合分析建议 | Offer / 决策支持 |
 
 ### 1.2 设计范围
 
 - 覆盖需求文档中的 7 个功能模块（A 用户管理 / B 简历匹配 / C 模拟面试 / D 复盘 / E 转行 / F 谈薪 / G 题库）
+- 扩展模块（v1.2 起）：真实面试复盘、备战计划、岗位爬虫与同步、简历→岗位匹配、Offer 对比、公共题库
 - 覆盖非功能需求（安全、性能、可靠性、可扩展性）
 - 不含：移动端、多租户、支付计费（需求文档标记为 W 级）
 
@@ -143,20 +149,32 @@ backend/
 │   ├── api/                     # 路由层（只做参数校验与响应组装）
 │   │   ├── deps.py              # 依赖注入（当前用户、DB session）
 │   │   ├── auth.py              # 认证接口
-│   │   ├── resume.py            # 简历诊断接口
+│   │   ├── resume.py            # 简历上传/解析接口
+│   │   ├── jd.py                # JD 历史管理接口
 │   │   ├── interview.py         # 面试接口（含 SSE 端点）
+│   │   ├── interviewer.py       # 面试官角色接口
 │   │   ├── report.py            # 复盘报告接口
+│   │   ├── profile.py           # 能力画像接口（雷达图/趋势）
+│   │   ├── real_interview.py    # 真实面试复盘接口
+│   │   ├── study_plan.py        # 备战计划接口
+│   │   ├── position_match.py    # 简历→岗位匹配接口
+│   │   ├── offer.py             # Offer 管理与对比接口
+│   │   ├── question.py          # 题库管理接口
 │   │   ├── career.py            # 转行诊断接口
 │   │   ├── salary.py            # 谈薪评估接口
-│   │   ├── question.py          # 题库管理接口
 │   │   └── provider.py          # LLM Provider 配置接口
 │   ├── services/                # 业务服务层
+│   │   ├── resume_parser.py     # 简历解析（结构化画像提取）
 │   │   ├── resume_matcher.py    # 简历×JD 匹配服务
 │   │   ├── interview_orchestrator.py  # 面试编排器（状态机+Agent+决策）
 │   │   ├── feedback.py          # 复盘与评分服务
-│   │   ├── career_diagnosis.py  # 转行诊断服务
-│   │   ├── salary_eval.py       # 谈薪评估服务
-│   │   └── ability_profile.py   # 能力画像聚合服务
+│   │   ├── ability_profile.py   # 能力画像聚合服务
+│   │   ├── real_interview_review.py   # 真实面试复盘（AI 逐题批改）
+│   │   ├── study_plan.py        # 备战计划生成服务
+│   │   ├── position_matcher.py  # 简历→岗位匹配服务
+│   │   ├── offer_compare.py     # Offer 加权对比服务
+│   │   ├── job_crawler.py       # 岗位数据爬虫（职友集等外部源）
+│   │   └── sync_state.py        # 爬虫同步状态（幂等控制）
 │   ├── agents/                  # 有边界 Agent 层
 │   │   ├── interview_agent.py   # 面试官 Agent（工具绑定/限制/JSON契约）
 │   │   ├── tools.py             # 只读工具（岗位知识/简历证据/学习覆盖）
@@ -166,13 +184,15 @@ backend/
 │   │   ├── next_question_decision.py  # 动态RAG：四信号→下一问策略
 │   │   └── embedding.py         # Embedding 客户端封装
 │   ├── models/                  # SQLAlchemy ORM
-│   │   ├── user.py
-│   │   ├── position.py
-│   │   ├── knowledge_atom.py
-│   │   ├── resume.py
-│   │   ├── interview.py
-│   │   ├── report.py
-│   │   └── career.py
+│   │   ├── user.py              # 用户 + LLM Provider 配置
+│   │   ├── position.py          # 岗位（含招聘字段）+ 知识原子（题库）
+│   │   ├── resume.py            # 简历 + JD 历史 + 匹配诊断 + 岗位匹配记录
+│   │   ├── interview.py         # 面试会话 + 消息流 + 复盘报告
+│   │   ├── interviewer.py       # 面试官角色
+│   │   ├── career.py            # 能力画像 + 转行规划 + 谈薪评估
+│   │   ├── real_interview.py    # 真实面试复盘（问答 + AI 批改）
+│   │   ├── offer.py             # Offer 记录
+│   │   └── study.py             # 备战计划
 │   ├── schemas/                 # Pydantic 输入输出契约
 │   ├── repositories/            # 数据访问层
 │   ├── llm/                     # LLM Provider 适配层
@@ -198,16 +218,22 @@ frontend/
 │   ├── stores/                  # Pinia（用户、面试会话、Provider、岗位）
 │   ├── api/                     # Axios 封装 + SSE 客户端
 │   ├── views/
+│   │   ├── Landing.vue          # 落地页
 │   │   ├── Login.vue
-│   │   ├── Dashboard.vue        # 首页：Lollipop 风格（大输入框 + 岗位卡片网格）
-│   │   ├── JobMarket.vue        # 岗位广场（卡片网格/筛选/详情/一键面试）
-│   │   ├── InterviewSetup.vue   # 面试设置向导（岗位→面试官→难度→简历）
-│   │   ├── Interview.vue        # 面试会话（文字/语音）
-│   │   ├── Report.vue           # 复盘报告
+│   │   ├── Dashboard.vue        # 工作台：Lollipop 风格（大输入框 + 岗位卡片网格）
+│   │   ├── ProviderConfig.vue   # 模型配置（LLM Provider）
 │   │   ├── ResumeDiagnosis.vue  # 简历×JD 诊断（向导式）
-│   │   ├── OfferCompare.vue     # Offer 对比（向导式）
+│   │   ├── ResumeMatch.vue      # 简历→岗位匹配
+│   │   ├── JobMarket.vue        # 岗位广场（卡片网格/筛选/一键面试）
+│   │   ├── Interview.vue        # 面试会话（文字/语音，SSE）
+│   │   ├── InterviewHistory.vue # 面试历史
+│   │   ├── Report.vue           # 复盘报告
+│   │   ├── AbilityProfile.vue   # 能力画像（雷达图 + 成长趋势）
+│   │   ├── RealInterview.vue    # 真实面试复盘
+│   │   ├── StudyPlan.vue        # 备战计划
 │   │   ├── CareerDiagnosis.vue  # 转行诊断
 │   │   ├── SalarySim.vue        # 谈薪模拟
+│   │   ├── OfferCompare.vue     # Offer 对比（向导式）
 │   │   └── QuestionBank.vue     # 题库管理
 │   └── components/
 │       ├── layout/              # 极简导航/侧边栏（可折叠）
@@ -402,7 +428,7 @@ frontend/
   └─ 首页大输入框搜索 → 命中岗位卡片 or 生成"自定义岗位"入口
 ```
 
-**岗位模型扩展字段**：`company / salary_range_json / location / source(public/private/sync) / description / jd_text`。
+**岗位模型扩展字段**：`company / city / salary_min / salary_max / description / welfare / source(builtin/zhaopin/liepin) / source_id(幂等去重) / source_url / published_at / synced_at`。
 
 ### 4.11 前端设计系统（向导式 + 极简导航）
 
@@ -430,6 +456,78 @@ frontend/
 
 **首页（Dashboard）Lollipop 风格**：居中大输入框"告诉 AI 你想面试的岗位" + 岗位卡片网格 + 快捷功能入口，侧边栏弱化为窄栏。
 
+### 4.12 真实面试复盘（Real Interview Review）
+
+**定位**：用户在真实面试后将问答录入系统，由 AI 逐题批改并沉淀为能力画像数据，形成"模拟训练 → 真实面试 → 复盘改进"的闭环。
+
+```
+录入真实面试(公司/岗位/轮次/备注) + 逐条问答(question/answer)
+  → real_interview_review.py：LLM 逐题批改(score + comment)
+  → LLM 整体复盘(overall_score / dimensions / summary / suggestions)
+  → 写入 real_interviews.review + real_interview_items
+  → 汇总进能力画像聚合源（与模拟面试报告同源聚合）
+```
+
+**设计约束**：限流 20 次/分钟；逐题批改支持增量（已批改题目不重复调用 LLM）；复盘结果 JSON 结构固定，前端可直接渲染。
+
+### 4.13 备战计划 / 学习路线（Study Plan）
+
+**定位**：基于能力画像缺口 + 目标岗位生成 N 天冲刺计划，任务勾选推进，形成"发现问题 → 制定计划 → 执行跟踪"闭环。
+
+```
+输入: 能力画像(weak_points/dimensions) + 目标岗位
+  → study_plan.py：LLM 生成 N 天任务清单
+     tasks = [{day, title, description, topics, done}]
+  → 存入 study_plans 表
+  → 前端日历/清单勾选 done
+  → 全部任务完成 → status=completed + 生成 summary
+```
+
+**设计约束**：任务可勾选、可续期；计划状态机 `active → completed / archived`。
+
+### 4.14 岗位爬虫与同步（Job Crawler + Sync State）
+
+**定位**：岗位广场数据源分层（`builtin` 内置 / 外部平台爬取），爬虫抓取真实招聘数据入库，保证可用性与时效性。
+
+| 层 | 来源 | 幂等键 | 说明 |
+|---|---|---|---|
+| `builtin` | 内置岗位库（种子数据） | name + direction | 零依赖兜底，始终可用 |
+| 外部源 | 职友集等招聘平台 | `source_id`（平台职位 ID） | 抓取 → 去重 upsert → 标记 `synced_at` |
+
+**同步机制**：
+- `source_id` 唯一索引保证**幂等**（重复抓取不产生重复记录）；
+- 单次同步失败不影响已有数据（事务级回滚），同步状态写入 `sync_state` 表；
+- 爬虫数据与业务数据解耦，清理外部源数据不影响用户自建岗位。
+
+**Position 模型新增字段**：`company / city / salary_min / salary_max / description / welfare / source / source_id / source_url / published_at / synced_at`。
+
+### 4.15 简历 → 岗位智能匹配（Position Matcher）
+
+**定位**：从"简历×JD 单岗位诊断"扩展为"简历 → 岗位库 Top N 推荐"，辅助求职者定位合适岗位。
+
+```
+输入: 简历技能 + 可选筛选(方向/城市/难度) + limit
+  → position_matcher.py：技能命中/缺口匹配计算
+  → 输出 Top N: [{position, match_score, matched_skills, missing_skills, reason, dimension_breakdown}]
+  → 覆盖式保存到 resume_position_matches（同简历仅保留最近一次）
+  → GET /resumes/{id}/matches 读取快照
+```
+
+**设计约束**：匹配为离线规则计算（技能 Jaccard + 方向/难度加权），不依赖 LLM，保证响应速度与可复现；`reason` 用模板生成，避免额外 LLM 调用。
+
+### 4.16 Offer 对比（Offer Compare）
+
+**定位**：多 Offer 结构化录入 + 加权评分对比 + AI 综合分析，辅助 Offer 决策。
+
+```
+录入多个 Offer(公司/岗位/城市/月薪/年终月数/股票/平衡度/福利/备注)
+  → offer_compare.py：按统一权重计算各 Offer 加权总分 + 维度明细
+  → LLM 综合建议(≥2 个 Offer 时)：对比要点 + 决策建议
+  → 前端表格对比视图
+```
+
+**设计约束**：权重可配置（默认：月薪 35% / 年终 15% / 股票 20% / 平衡度 20% / 福利 10%）；评分逻辑与 LLM 建议解耦——即使 LLM 不可用，对比表格仍可用。
+
 ---
 
 ## 5. 数据模型设计
@@ -452,6 +550,13 @@ users 1───N ability_profiles
 users 1───N interviewers          (自建面试官角色)
 users 1───N positions             (自建岗位)
 users 1───N user_favorites        (岗位收藏, C级)
+users 1───N job_descriptions      (JD 历史)
+resumes 1───N resume_position_matches
+positions 1───N resume_position_matches
+users 1───N real_interviews
+real_interviews 1───N real_interview_items
+users 1───N offers
+users 1───N study_plans
 ```
 
 ### 5.2 核心表设计
@@ -460,7 +565,7 @@ users 1───N user_favorites        (岗位收藏, C级)
 |---|---|---|
 | `users` | id, username, password_hash, email, role(user/admin), target_city, years_of_exp, target_position, created_at | 用户与资料 |
 | `llm_providers` | id, user_id, provider_name, api_key_encrypted, base_url, model, is_active | API Key 加密存储 |
-| `positions` | id, name, direction, difficulty(easy/normal/hard), skills_json, company, salary_range_json, location, source(public/private/sync), jd_text, description, is_public, creator_id, status | 岗位，方向可配置，含招聘信息（岗位广场数据源） |
+| `positions` | id, name, direction, difficulty(junior/mid/senior), skills_json, company, city, salary_min, salary_max, description, welfare_json, source(builtin/zhaopin/liepin), source_id, source_url, published_at, synced_at, is_public, creator_id, status | 岗位，含真实招聘信息与外部同步元数据（岗位广场数据源） |
 | `interviewers` | id, name, title, persona, style, interview_type(normal/switch/salary/all), difficulty_bias, is_public, created_by | 面试官角色库（人设+风格+难度偏移） |
 | `knowledge_atoms` | id, position_id, question, reference_points_json, tags_json, difficulty, status(draft/published/archived), created_by | 知识原子 |
 | `resumes` | id, user_id, file_path, parsed_json, skills_json, created_at | 简历画像 |
@@ -468,9 +573,15 @@ users 1───N user_favorites        (岗位收藏, C级)
 | `interviews` | id, user_id, position_id, resume_id, interviewer_id, difficulty(easy/normal/hard), mode(text/voice/video), interview_type(normal/switch/salary), status, config_json, created_at, finished_at | 面试会话（含面试官与难度） |
 | `interview_messages` | id, interview_id, role, content, strategy, evidence_atom_ids_json, created_at | 消息流（含策略与证据） |
 | `reports` | id, interview_id, overall_score, dimensions_json, question_feedback_json, weak_points_json, created_at | 复盘报告 |
-| `ability_profiles` | id, user_id, dimensions_json, updated_at | 能力画像聚合 |
-| `career_plans` | id, user_id, from_position, to_position, transferable_json, gaps_json, roadmap_json, created_at | 转行规划 |
+| `ability_profiles` | id, user_id, dimensions_json, skill_scores_json, updated_at | 能力画像聚合（由最近报告实时聚合后 upsert 缓存） |
+| `career_plans` | id, user_id, from_position, to_position, transferable_json, gaps_json, roadmap_json, transition_projects_json, summary, created_at | 转行规划 |
 | `salary_evals` | id, user_id, skill_stack_json, years, city, target_position, result_json, created_at | 谈薪评估 |
+| `job_descriptions` | id, user_id, title, content, created_at | 用户保存的 JD 历史 |
+| `resume_position_matches` | id, user_id, resume_id, position_id, match_score, matched_skills_json, missing_skills_json, reason, created_at | 简历→岗位匹配推荐（覆盖式，同简历保留最近一次） |
+| `real_interviews` | id, user_id, company, position, interview_date, round_type, notes, review_json, created_at | 真实面试复盘（review: {overall_score, dimensions, summary, suggestions}） |
+| `real_interview_items` | id, interview_id(FK, CASCADE), question, answer, score, comment | 真实面试单条问答与 AI 批改 |
+| `offers` | id, user_id, company, position, city, monthly_salary, bonus_months, stock_value, work_balance, benefits, notes, created_at | Offer 记录 |
+| `study_plans` | id, user_id, title, target_position, days, tasks_json, status(active/completed/archived), summary, created_at | 备战计划（tasks: [{day, title, description, topics, done}]） |
 
 > JSON 字段使用 SQLite JSON 类型（可迁移到 PostgreSQL JSONB）。
 
@@ -501,6 +612,15 @@ users 1───N user_favorites        (岗位收藏, C级)
 | 转行 | POST | `/api/career/diagnosis` | 转行诊断 | JWT |
 | 谈薪 | POST | `/api/salary/evaluate` | 薪资评估 | JWT |
 | 题库 | CRUD | `/api/questions` | 知识原子管理（ADMIN 发布） | JWT+角色 |
+| JD | CRUD | `/api/jds` | 岗位 JD 历史管理 | JWT |
+| 匹配 | POST | `/api/resumes/{id}/match-positions` | 简历→岗位匹配 Top N（覆盖保存） | JWT |
+| 匹配 | GET | `/api/resumes/{id}/matches` | 读取最近匹配推荐快照 | JWT |
+| 真实复盘 | CRUD | `/api/real-interviews` | 真实面试复盘录入/列表/详情/删除 | JWT |
+| 备战计划 | POST | `/api/study-plans/generate` | 基于画像缺口+目标岗位生成计划 | JWT |
+| 备战计划 | GET/PATCH/DELETE | `/api/study-plans` | 计划列表 / 任务勾选 / 删除 | JWT |
+| Offer | CRUD | `/api/offers` | Offer 录入管理 | JWT |
+| Offer | GET | `/api/offers/compare` | 多 Offer 加权对比 + AI 建议（需 ≥2） | JWT |
+| 画像 | GET | `/api/profile` | 能力画像聚合（雷达图/趋势/弱点） | JWT |
 
 **岗位创建请求（POST /api/positions）**：
 
@@ -508,12 +628,13 @@ users 1───N user_favorites        (岗位收藏, C级)
 {
   "name": "后端开发工程师",
   "direction": "backend",
-  "difficulty": "normal",
+  "difficulty": "mid",
   "skills": ["Python", "MySQL", "FastAPI"],
   "company": "某互联网公司",
-  "salary_range": { "min": 20000, "max": 35000 },
-  "location": "杭州",
-  "jd_text": "负责……任职要求……"
+  "city": "杭州",
+  "salary_min": 20,
+  "salary_max": 35,
+  "description": "负责……任职要求……"
 }
 ```
 
@@ -634,10 +755,10 @@ event: finished      data: {"message": "面试结束，正在生成报告……"
 
 | 阶段 | 架构扩展 |
 |---|---|
-| Phase 1 MVP | 本文档全量实现（SQLite + ChromaDB + 文字/语音面试 + 难度选择 + 岗位广场基础 + 向导式骨架） |
-| Phase 2 | 面试官角色库、能力画像/成长追踪/转行诊断/谈薪模块、首页 Lollipop 风格 |
-| Phase 3 | 公共题库审核、视频面试（face-api.js）、岗位详情与搜索、我的岗位 |
-| Phase 4 | PostgreSQL + Qdrant 生产化、多岗位方向扩展、外部招聘 API 同步（SYNC 源）、离线 RAG 评测 |
+| Phase 1 MVP ✅ | SQLite + ChromaDB + 文字面试 + 简历×JD 诊断 + 复盘报告 + 岗位广场基础 |
+| Phase 2 ✅ | 面试官角色库、难度档位、转行诊断、谈薪模拟、能力画像、语音面试、多 Provider、Lollipop 首页 |
+| Phase 3 ✅ | 真实面试复盘、备战计划、岗位爬虫与幂等同步、简历→岗位匹配、Offer 对比、成长趋势、公共题库 |
+| Phase 4 | PostgreSQL + Qdrant 生产化、视频面试（face-api.js，C 级）、题库批量导入、外部招聘 API 全量同步、离线 RAG 评测、CI/CD |
 
 ---
 

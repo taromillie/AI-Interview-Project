@@ -5,11 +5,17 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.db import get_db
 from app.models.interview import Interview, Report
+from app.services.interview_orchestrator import REPORT_PENDING_SUMMARY
 from app.workers.report import generate_report_task
 from app.models.user import User
 from app.schemas.interview import ReportOut
 
 router = APIRouter(prefix="/reports", tags=["复盘报告"])
+
+
+def _is_pending_report(report: Report | None) -> bool:
+    """总评为占位标记即表示报告仍在后台生成。"""
+    return report is not None and report.summary == REPORT_PENDING_SUMMARY
 
 
 @router.post("/interviews/{interview_id}/generate", status_code=202)
@@ -23,10 +29,13 @@ def enqueue_report(
     interview = db.get(Interview, interview_id)
     if interview is None or interview.user_id != user.id:
         raise HTTPException(status_code=404, detail="面试不存在")
-    if db.query(Report).filter(Report.interview_id == interview_id).first():
+    existing = db.query(Report).filter(Report.interview_id == interview_id).first()
+    if existing and not _is_pending_report(existing):
         return {"status": "reported", "interview_id": interview_id}
-    interview.status = "finishing"
-    db.commit()
+    if existing is None:
+        interview.status = "finishing"
+        db.commit()
+    # 占位报告存在（生成中/上次任务中断）：重新入队确保完成
     background_tasks.add_task(generate_report_task, interview_id)
     return {"status": "processing", "interview_id": interview_id}
 
@@ -42,8 +51,14 @@ def report_status(
     if interview is None or interview.user_id != user.id:
         raise HTTPException(status_code=404, detail="面试不存在")
     report = db.query(Report).filter(Report.interview_id == interview_id).first()
+    if _is_pending_report(report):
+        status = "processing"
+    elif report:
+        status = "reported"
+    else:
+        status = "processing" if interview.status == "finishing" else interview.status
     return {
-        "status": "reported" if report else ("processing" if interview.status == "finishing" else interview.status),
+        "status": status,
         "interview_id": interview_id,
         "report_id": report.id if report else None,
     }

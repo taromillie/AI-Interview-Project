@@ -1,9 +1,23 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    // Element Plus 按需引入（T6 首屏优化）：
+    // 模板中的 el-* 组件由 unplugin-vue-components 自动导入组件与样式；
+    // 命令式 API（ElMessage / ElMessageBox / ElLoading）在 main.js 手动注册。
+    Components({
+      resolvers: [
+        ElementPlusResolver({
+          importStyle: 'css',
+        }),
+      ],
+    }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -17,6 +31,19 @@ export default defineConfig({
       // 使用相对路径作为入口，规避 Windows 中文路径下
       // rollup emitFile 校验把绝对路径当作 fileName 的缺陷
       input: 'index.html',
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.spec.js'],
+    css: false,
+    testTimeout: 20000,
+    server: {
+      deps: {
+        // element-plus 的 ESM 构建含 css import，需交给 vite 转换而非 Node 原生加载
+        inline: ['element-plus'],
+      },
     },
   },
   server: {

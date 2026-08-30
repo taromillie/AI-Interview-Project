@@ -6,8 +6,9 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
+# timeout=30 等价于 SQLite busy_timeout=30000ms：后台任务写库时，并发读请求等待而非立刻报"database is locked"
 connect_args = (
-    {"check_same_thread": False}
+    {"check_same_thread": False, "timeout": 30}
     if settings.DATABASE_URL.startswith("sqlite")
     else {}
 )
@@ -50,6 +51,8 @@ def init_db() -> None:
 
     if settings.DATABASE_URL.startswith("sqlite"):
         with engine.connect() as conn:
+            # WAL 模式：读写不互斥，避免后台报告生成与请求并发时互相阻塞（导致 500）
+            conn.execute(text("PRAGMA journal_mode=WAL"))
             _ensure_column(conn, "career_plans", "summary", "summary TEXT DEFAULT ''")
             _ensure_column(conn, "career_plans", "transition_projects", "transition_projects JSON")
             _ensure_column(conn, "resumes", "name", "name VARCHAR(200) NOT NULL DEFAULT ''")
@@ -68,4 +71,10 @@ def init_db() -> None:
             _ensure_column(conn, "positions", "source_url", "source_url VARCHAR(300)")
             _ensure_column(conn, "positions", "published_at", "published_at DATETIME")
             _ensure_column(conn, "positions", "synced_at", "synced_at DATETIME")
+            # v1.3：P2 功能收尾
+            _ensure_column(conn, "study_plans", "position_id", "position_id INTEGER")
+            # v1.4：复盘报告补全总评/知识覆盖/学习路线（此前生成报告时丢失了这些字段）
+            _ensure_column(conn, "reports", "summary", "summary TEXT NOT NULL DEFAULT ''")
+            _ensure_column(conn, "reports", "coverage", "coverage JSON")
+            _ensure_column(conn, "reports", "learning_path", "learning_path JSON")
             conn.commit()

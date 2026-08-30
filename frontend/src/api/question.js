@@ -35,3 +35,7 @@ export function createAtom({ position_id, question, reference_points = [], tags 
 export function publishAtom(atomId) {
   return http.post(`/questions/${atomId}/publish`)
 }
+
+export function importAtoms({ position_id, format = 'auto', text }) {
+  return http.post('/questions/import', { position_id, format, text })
+}

@@ -48,4 +48,7 @@ class Report(Base):
     dimensions: Mapped[dict] = mapped_column(JSON, default=dict)      # {tech, expression, logic, project}
     question_feedback: Mapped[list] = mapped_column(JSON, default=list)
     weak_points: Mapped[list] = mapped_column(JSON, default=list)     # 弱点标签
+    summary: Mapped[str] = mapped_column(Text, default="")            # 总评与建议
+    coverage: Mapped[dict] = mapped_column(JSON, default=dict)        # {covered:[], uncovered:[]}
+    learning_path: Mapped[list] = mapped_column(JSON, default=list)   # [{phase,duration,action}]
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

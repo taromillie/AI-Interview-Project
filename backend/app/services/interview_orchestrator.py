@@ -6,6 +6,7 @@
     {"event": "finished", "data": {"message", "report_id"}}
 """
 import logging
+import threading
 from datetime import datetime
 
 from sqlalchemy import select
@@ -28,7 +29,6 @@ from app.models.user import User
 from app.rag.embedding import get_embedding_provider
 from app.rag.next_question_decision import analyze_signals, is_low_information
 from app.rag.retriever import hit_score
-from app.services.feedback import fallback_report, generate_report
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,9 @@ VALID_STATUS = {"created", "asking", "finishing", "reported"}
 PROBE_STRATEGIES = {"deep_dive", "probe", "project_probe"}
 # 同一方向允许的最大连续追问轮数，超过后强制切换话题
 MAX_PROBE_STREAK = 3
+
+# 占位报告的总评标记：后台生成完成后会被真实总评覆盖，前端据此轮询
+REPORT_PENDING_SUMMARY = "报告生成中，请稍后刷新查看…"
 
 # 面试结束语（口语化、有温度，随机取一个）
 FAREWELL_VARIANTS = [
@@ -289,36 +292,27 @@ class InterviewOrchestrator:
         }
 
     async def finish(self) -> dict:
-        """结束面试并生成复盘报告（LLM 失败走规则降级）。"""
+        """结束面试：立即返回，复盘报告在后台线程生成，接口不再长时间等待 LLM。"""
         if self.interview.status not in ("asking", "created", "finishing"):
             raise AppError("面试已结束")
         if self.interview.status != "finishing":
             self.interview.status = "finishing"
             self.db.commit()
 
-        messages = self._messages()
-        try:
-            data = await generate_report(
-                llm=self.llm,
-                position_name=self._position_name(),
-                position_skills=self._position_skills(),
-                resume_brief=self._resume_brief(),
-                messages=messages,
-            )
-        except Exception as exc:  # noqa: BLE001 - 保证一定有报告
-            logger.warning("LLM 报告生成失败，使用规则降级: %s", exc)
-            data = fallback_report(messages)
-
-        # 面试官结束语：在报告生成之后保存，避免被报告当作候选问题分析
+        # 面试官结束语：先保存（后台报告任务会排除 farewell 消息，避免被当作候选问题分析）
         farewell = self._farewell_text()
         self._save_message("assistant", farewell, "farewell")
 
+        # 先落一条占位报告，报告页可立即展示"生成中"，后台任务完成后更新为真实内容
         report = Report(
             interview_id=self.interview.id,
-            overall_score=data.get("overall_score", 0.0),
-            dimensions=data.get("dimensions", {}),
-            question_feedback=data.get("question_feedback", []),
-            weak_points=data.get("weak_points", []),
+            overall_score=0.0,
+            dimensions={},
+            question_feedback=[],
+            weak_points=[],
+            summary=REPORT_PENDING_SUMMARY,
+            coverage={"covered": [], "uncovered": []},
+            learning_path=[],
         )
         self.interview.status = "reported"
         self.interview.finished_at = datetime.now()
@@ -326,10 +320,20 @@ class InterviewOrchestrator:
         self.db.commit()
         self.db.refresh(report)
 
+        interview_id = self.interview.id
+
+        def _run() -> None:
+            # 延迟导入：避免 workers.report 与本模块循环导入
+            from app.workers.report import generate_report_task
+
+            generate_report_task(interview_id)
+
+        threading.Thread(target=_run, daemon=True).start()
+
         return {
             "event": "finished",
             "data": {
-                "message": data.get("summary") or "面试结束，复盘报告已生成。",
+                "message": "面试结束，复盘报告正在生成。",
                 "report_id": report.id,
                 "farewell": farewell,
             },

@@ -42,3 +42,19 @@ class MatchDiagnostic(Base):
     gaps: Mapped[list] = mapped_column(JSON, default=list)          # [{skill, required_level, current_level, suggestion}]
     suggestions: Mapped[list] = mapped_column(JSON, default=list)   # 简历优化建议
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ResumePositionMatch(Base):
+    """简历→岗位匹配推荐记录（覆盖式保存，同一简历仅保留最近一次）。"""
+
+    __tablename__ = "resume_position_matches"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    resume_id: Mapped[int] = mapped_column(ForeignKey("resumes.id"), index=True)
+    position_id: Mapped[int] = mapped_column(ForeignKey("positions.id"))
+    match_score: Mapped[float] = mapped_column(Float, default=0.0)      # 0-100
+    matched_skills: Mapped[list] = mapped_column(JSON, default=list)   # 命中技能
+    missing_skills: Mapped[list] = mapped_column(JSON, default=list)   # 缺口技能
+    reason: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

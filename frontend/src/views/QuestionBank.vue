@@ -15,7 +15,10 @@
       <template #header>
         <div class="header">
           <span>题库管理（知识原子）</span>
-          <el-button type="primary" @click="dialogVisible = true">新建题目</el-button>
+          <div class="header-actions">
+            <el-button @click="importDialogVisible = true">批量导入</el-button>
+            <el-button type="primary" @click="dialogVisible = true">新建题目</el-button>
+          </div>
         </div>
       </template>
 
@@ -28,6 +31,15 @@
           clearable
           placeholder="搜索题目 / 标签关键词"
           style="width: 220px"
+          class="keyword-input"
+          @keyup.enter="loadAtoms"
+          @clear="loadAtoms"
+        />
+        <el-input
+          v-model="tag"
+          clearable
+          placeholder="按标签精确筛选"
+          style="width: 160px"
           class="keyword-input"
           @keyup.enter="loadAtoms"
           @clear="loadAtoms"
@@ -121,6 +133,48 @@
         <el-button type="primary" :loading="saving" @click="saveAtom">保存（草稿）</el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量导入 -->
+    <el-dialog v-model="importDialogVisible" title="批量导入题目" width="640px" top="6vh">
+      <el-alert type="info" :closable="false" style="margin-bottom: 14px">
+        <template #title>
+          支持 JSON 数组（含 question/tags/reference_points）或 Markdown（## 题目 + 要点列表）。
+          重复题目自动跳过；导入后为私有草稿，可逐条发布。
+        </template>
+      </el-alert>
+      <el-form :model="importForm" label-width="90px">
+        <el-form-item label="所属岗位">
+          <el-select v-model="importForm.position_id" placeholder="选择岗位" style="width: 100%">
+            <el-option v-for="p in positions" :key="p.id" :label="positionLabel(p)" :value="p.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="格式">
+          <el-radio-group v-model="importForm.format">
+            <el-radio value="auto">自动识别</el-radio>
+            <el-radio value="json">JSON</el-radio>
+            <el-radio value="markdown">Markdown</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input
+            v-model="importForm.text"
+            type="textarea"
+            :rows="8"
+            placeholder="粘贴题目内容，或点击下方选择 .json / .md 文件"
+          />
+        </el-form-item>
+        <el-form-item label="文件">
+          <input ref="fileInput" type="file" accept=".json,.md,.txt" style="display: none" @change="onImportFile" />
+          <el-button @click="fileInput.click()">选择文件</el-button>
+          <span v-if="importFileName" class="file-name">{{ importFileName }}</span>
+          <el-button v-if="importFileName" text type="primary" @click="clearImportFile">清除</el-button>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="importing" @click="doImport">开始导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -129,7 +183,7 @@ import { Collection } from '@element-plus/icons-vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { createAtom, listAtoms, listPositions, publishAtom } from '@/api/question'
+import { createAtom, importAtoms, listAtoms, listPositions, publishAtom } from '@/api/question'
 
 const DIFF_TEXT = { junior: '初级', mid: '中级', senior: '高级' }
 const STATUS_TEXT = { draft: '草稿', published: '已发布', archived: '已归档' }
@@ -139,6 +193,7 @@ const positions = ref([])
 const atoms = ref([])
 const positionId = ref(null)
 const keyword = ref('')
+const tag = ref('')
 
 function positionLabel(p) {
   return p.company ? `${p.company} ${p.name}` : p.name
@@ -156,6 +211,64 @@ const form = reactive({
   reference: '',
 })
 
+// ── 批量导入 ──
+const importDialogVisible = ref(false)
+const importing = ref(false)
+const importForm = reactive({ position_id: null, format: 'auto', text: '' })
+const importFileName = ref('')
+const fileInput = ref(null)
+
+function onImportFile(e) {
+  const file = e.target.files && e.target.files[0]
+  if (!file) return
+  importFileName.value = file.name
+  const reader = new FileReader()
+  reader.onload = () => {
+    importForm.text = String(reader.result || '')
+  }
+  reader.readAsText(file)
+  e.target.value = ''
+}
+
+function clearImportFile() {
+  importFileName.value = ''
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+async function doImport() {
+  if (!importForm.position_id) {
+    ElMessage.warning('请选择所属岗位')
+    return
+  }
+  if (!importForm.text.trim()) {
+    ElMessage.warning('请粘贴内容或选择文件')
+    return
+  }
+  importing.value = true
+  try {
+    const res = await importAtoms({
+      position_id: importForm.position_id,
+      format: importForm.format,
+      text: importForm.text,
+    })
+    const base = `导入完成：新建 ${res.created} 条，跳过重复 ${res.skipped} 条`
+    const failed = (res.errors || []).length
+    if (failed) {
+      ElMessage.warning(`${base}，失败 ${failed} 条`)
+    } else {
+      ElMessage.success(base)
+    }
+    importDialogVisible.value = false
+    Object.assign(importForm, { position_id: null, format: 'auto', text: '' })
+    clearImportFile()
+    await loadAtoms()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '导入失败，请检查内容格式')
+  } finally {
+    importing.value = false
+  }
+}
+
 async function loadPositions() {
   try {
     positions.value = await listPositions()
@@ -171,6 +284,7 @@ async function loadAtoms() {
     if (positionId.value) params.position_id = positionId.value
     if (status.value) params.status = status.value
     if (keyword.value.trim()) params.keyword = keyword.value.trim()
+    if (tag.value.trim()) params.tag = tag.value.trim()
     atoms.value = await listAtoms(params)
   } finally {
     loading.value = false
@@ -247,5 +361,14 @@ onMounted(() => {
 }
 .tag {
   margin-right: 4px;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+.file-name {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--app-text-secondary);
 }
 </style>
