@@ -7,6 +7,7 @@ SSE 事件协议：
 - error：{"message"}
 """
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
@@ -33,6 +34,7 @@ from app.services.llm_utils import require_llm
 from app.repositories import InterviewRepository
 
 router = APIRouter(prefix="/interviews", tags=["模拟面试"])
+logger = logging.getLogger(__name__)
 repository = InterviewRepository()
 
 
@@ -152,7 +154,18 @@ async def start_interview(
             "event": "preparing",
             "data": json.dumps({"message": "面试官已就绪，正在出题…"}, ensure_ascii=False),
         }
-        outcome = await orchestrator.start()
+        try:
+            outcome = await orchestrator.start()
+        except AppError as exc:
+            yield {"event": "error", "data": json.dumps({"message": str(exc)}, ensure_ascii=False)}
+            return
+        except Exception as exc:  # noqa: BLE001 - SSE 兜底，避免开场失败直接断流
+            logger.warning("面试开场失败 interview_id=%s: %s", interview_id, exc)
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": "面试官暂时不可用，请稍后重试"}, ensure_ascii=False),
+            }
+            return
         yield {
             "event": outcome["event"],
             "data": json.dumps(outcome["data"], ensure_ascii=False),

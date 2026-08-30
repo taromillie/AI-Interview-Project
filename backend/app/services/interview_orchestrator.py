@@ -9,7 +9,7 @@ import logging
 import threading
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.agents.interview_agent import InterviewAgent
@@ -199,7 +199,10 @@ class InterviewOrchestrator:
             self.db.commit()
             return await self.finish()
 
-        asked_ids = {m.id for m in self._messages()}
+        # 已问过的题目 id 从消息的证据原子中收集（消息 id 与原子 id 各自自增，不能混用）
+        asked_ids = set()
+        for m in self._messages():
+            asked_ids.update(m.evidence_atom_ids or [])
         probe_streak = self._probe_streak()
 
         # ---- 工作包 A：有边界工具装配（只读 + 单轮≤3 次调用） ----
@@ -292,12 +295,25 @@ class InterviewOrchestrator:
         }
 
     async def finish(self) -> dict:
-        """结束面试：立即返回，复盘报告在后台线程生成，接口不再长时间等待 LLM。"""
-        if self.interview.status not in ("asking", "created", "finishing"):
+        """结束面试：立即返回，复盘报告在后台线程生成，接口不再长时间等待 LLM。
+
+        幂等保护：通过原子状态迁移 created/asking → finishing 抢占收尾权，
+        并发/重复调用只有第一次能成功，其余直接拒绝，避免重复触发报告任务。
+        """
+        if self.interview.status == "reported":
             raise AppError("面试已结束")
-        if self.interview.status != "finishing":
-            self.interview.status = "finishing"
-            self.db.commit()
+        if self.interview.status == "finishing":
+            raise AppError("面试已结束，报告正在生成")
+        claimed = self.db.execute(
+            update(Interview)
+            .where(Interview.id == self.interview.id)
+            .where(Interview.status.in_(("created", "asking")))
+            .values(status="finishing")
+        )
+        self.db.commit()
+        if claimed.rowcount != 1:
+            raise AppError("面试已结束，请勿重复操作")
+        self.db.refresh(self.interview)
 
         # 面试官结束语：先保存（后台报告任务会排除 farewell 消息，避免被当作候选问题分析）
         farewell = self._farewell_text()
