@@ -45,15 +45,6 @@ class InterviewMessageOut(BaseModel):
     created_at: object | None = None
 
 
-class InterviewDetailOut(InterviewOut):
-    messages: list[InterviewMessageOut] = Field(default_factory=list)
-    report: ReportOut | None = None
-
-
-class AnswerRequest(BaseModel):
-    content: str = Field(min_length=1, max_length=2000)
-
-
 class ReportOut(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -87,3 +78,12 @@ class ReportOut(BaseModel):
     @classmethod
     def _score_or_default(cls, v):
         return v if v is not None else 0.0
+
+
+class InterviewDetailOut(InterviewOut):
+    messages: list[InterviewMessageOut] = Field(default_factory=list)
+    report: ReportOut | None = None
+
+
+class AnswerRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
