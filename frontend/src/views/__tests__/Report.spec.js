@@ -12,7 +12,7 @@ const router = createRouter({
   history: createMemoryHistory(),
   routes: [
     { path: '/report/:id', component: { template: '<div />' } },
-    { path: '/question-bank', component: { template: '<div />' } },
+    { path: '/questions', name: 'questions', component: { template: '<div />' } },
   ],
 })
 
@@ -85,7 +85,7 @@ describe('面试复盘报告', () => {
     expect(tag).toBeTruthy()
     await tag.trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/question-bank')
+    expect(router.currentRoute.value.path).toBe('/questions')
     expect(router.currentRoute.value.query.keyword).toBe('Webpack')
   })
 })

@@ -47,6 +47,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0', // 允许局域网/其他设备访问（仅本机访问可删掉这行）
     port: 5173,
     // 本项目位于 CodeBuddy 工作区，目录 C:\Users\Meng\CodeBuddy\ai模拟面试
     // 实际是 junction，物理文件在 F:\CodeBuddyStorage\CodeBuddy-Projects\ai模拟面试。

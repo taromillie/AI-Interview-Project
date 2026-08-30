@@ -39,3 +39,13 @@ export function publishAtom(atomId) {
 export function importAtoms({ position_id, format = 'auto', text }) {
   return http.post('/questions/import', { position_id, format, text })
 }
+
+// AI 一键生成题目（预览，不入库）
+export function generateAtoms({ topic, position_id = null, count = 3 }) {
+  return http.post('/questions/generate', { topic, position_id, count })
+}
+
+// 批量保存 AI 生成的题目（草稿）
+export function saveGeneratedAtoms({ position_id, items }) {
+  return http.post('/questions/generate/save', { position_id, items })
+}

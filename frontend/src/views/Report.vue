@@ -185,7 +185,7 @@ let pollTimer = null
 const isGenerating = computed(() => report.value?.summary === PENDING_SUMMARY)
 
 function goPractice(knowledge) {
-  router.push({ path: '/question-bank', query: { keyword: knowledge } })
+  router.push({ name: 'questions', query: { keyword: knowledge } })
 }
 
 function scoreColor(s) {
