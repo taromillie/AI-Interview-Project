@@ -43,6 +43,24 @@
                 {{ q }}
               </button>
             </div>
+
+            <template v-if="plans.length">
+              <el-divider content-position="left">历史诊断（{{ plans.length }}）</el-divider>
+              <div class="history-list">
+                <div
+                  v-for="p in plans"
+                  :key="p.id"
+                  class="history-item"
+                  @click="loadPlan(p)"
+                >
+                  <div class="history-main">
+                    <div class="history-route">{{ p.from_position }} → {{ p.to_position }}</div>
+                    <div class="history-preview">{{ p.summary }}</div>
+                  </div>
+                  <span class="history-time">{{ formatTime(p.created_at) }}</span>
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- ② 目标岗位 -->
@@ -114,24 +132,6 @@
                 <b>{{ resumeLabel || '未关联' }}</b>
               </span>
             </div>
-
-            <template v-if="plans.length">
-              <div class="history-title">历史诊断（{{ plans.length }}）</div>
-              <div class="history-list">
-                <div
-                  v-for="p in plans"
-                  :key="p.id"
-                  class="history-item"
-                  @click="loadPlan(p)"
-                >
-                  <div class="history-main">
-                    <div class="history-route">{{ p.from_position }} → {{ p.to_position }}</div>
-                    <div class="history-preview">{{ p.summary }}</div>
-                  </div>
-                  <span class="history-time">{{ formatTime(p.created_at) }}</span>
-                </div>
-              </div>
-            </template>
           </section>
         </transition>
       </div>
@@ -622,16 +622,12 @@ onMounted(() => {
 }
 
 /* ── 历史诊断 ── */
-.history-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--app-text);
-  margin: 18px 0 10px;
-}
 .history-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
 }
 .history-item {
   display: flex;

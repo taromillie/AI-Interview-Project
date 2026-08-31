@@ -37,6 +37,26 @@
                 </el-select>
               </el-form-item>
             </el-form>
+
+            <template v-if="evals.length">
+              <el-divider content-position="left">历史评估（{{ evals.length }}）</el-divider>
+              <div class="history-list">
+                <div
+                  v-for="e in evals"
+                  :key="e.id"
+                  class="history-item"
+                  @click="loadEval(e)"
+                >
+                  <div class="history-main">
+                    <div class="history-route">{{ e.target_position }} · {{ e.city }} · {{ e.years }} 年</div>
+                    <div class="history-preview">
+                      {{ e.result.salary_range[0] }} ~ {{ e.result.salary_range[2] }} 元/月
+                    </div>
+                  </div>
+                  <span class="history-time">{{ formatTime(e.created_at) }}</span>
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- ② 技能 + 年限 -->
@@ -110,26 +130,6 @@
                 <b>{{ skillStack.length ? `${skillStack.length} 项` : '未填' }}</b>
               </span>
             </div>
-
-            <template v-if="evals.length">
-              <div class="history-title">历史评估（{{ evals.length }}）</div>
-              <div class="history-list">
-                <div
-                  v-for="e in evals"
-                  :key="e.id"
-                  class="history-item"
-                  @click="loadEval(e)"
-                >
-                  <div class="history-main">
-                    <div class="history-route">{{ e.target_position }} · {{ e.city }} · {{ e.years }} 年</div>
-                    <div class="history-preview">
-                      {{ e.result.salary_range[0] }} ~ {{ e.result.salary_range[2] }} 元/月
-                    </div>
-                  </div>
-                  <span class="history-time">{{ formatTime(e.created_at) }}</span>
-                </div>
-              </div>
-            </template>
           </section>
         </transition>
       </div>
@@ -554,16 +554,12 @@ onMounted(() => {
 .sum-item b { color: var(--app-text); }
 
 /* 历史 */
-.history-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--app-text);
-  margin: 18px 0 10px;
-}
 .history-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
 }
 .history-item {
   display: flex;

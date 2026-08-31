@@ -51,6 +51,11 @@ export function diagnose({ jd_text, resume_id, jd_id }) {
   })
 }
 
+// 简历×JD 诊断历史（含完整缺口与建议，可直接渲染报告）
+export function listDiagnostics() {
+  return http.get('/resumes/diagnostics')
+}
+
 // JD 历史列表
 export function listJds() {
   return http.get('/jds')

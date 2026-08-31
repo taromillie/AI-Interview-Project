@@ -121,6 +121,32 @@
             </div>
           </template>
           <el-empty v-else description="保存简历后，可在历史列表中选择用于诊断的一份" :image-size="60" />
+
+          <template v-if="diagnostics.length">
+            <el-divider content-position="left">历史诊断（{{ diagnostics.length }}）</el-divider>
+            <div class="history-list">
+              <div
+                v-for="d in diagnostics"
+                :key="d.id"
+                class="history-item"
+                @click="openHistoryDiagnostic(d)"
+              >
+                <div class="history-main">
+                  <div class="history-title">
+                    {{ d.resume_name || '未命名简历' }}
+                    <el-tag :type="scoreTag(d.match_score)" size="small">
+                      {{ Math.round(d.match_score) }} 分
+                    </el-tag>
+                  </div>
+                  <div class="history-meta">{{ formatTime(d.created_at) }}</div>
+                  <div class="history-preview">JD：{{ d.jd_excerpt || '（无摘要）' }}</div>
+                </div>
+                <el-button size="small" type="primary" plain @click.stop="openHistoryDiagnostic(d)">
+                  查看报告
+                </el-button>
+              </div>
+            </div>
+          </template>
         </section>
 
         <!-- ② JD -->
@@ -297,6 +323,7 @@ import {
   deleteJd,
   deleteResume,
   diagnose,
+  listDiagnostics,
   listJds,
   listResumes,
   updateJd,
@@ -323,6 +350,8 @@ const selectedResumeId = ref(null) // null = 最近一份
 const jds = ref([])
 const editingJdId = ref(null)
 const selectedJdId = ref(null) // null = 使用当前输入
+const diagnostics = ref([])
+const historyLabels = ref(null) // 从历史诊断打开结果页时，展示历史对象标签
 
 // ── 向导状态 ──
 const wizardSteps = [
@@ -384,6 +413,31 @@ async function loadJds() {
   } catch {
     /* 忽略 */
   }
+}
+
+async function loadDiagnostics() {
+  try {
+    diagnostics.value = await listDiagnostics()
+  } catch {
+    /* 忽略 */
+  }
+}
+
+function openHistoryDiagnostic(d) {
+  historyLabels.value = {
+    resume: d.resume_name || `简历 #${d.resume_id}`,
+    jd: d.jd_excerpt
+      ? (d.jd_excerpt.length > 18 ? `${d.jd_excerpt.slice(0, 18)}…` : d.jd_excerpt)
+      : '历史 JD',
+  }
+  result.value = {
+    diagnostic_id: d.id,
+    match_score: d.match_score,
+    gaps: d.gaps || [],
+    resume_suggestions: d.suggestions || [],
+  }
+  currentStep.value = 3
+  maxStep.value = 3
 }
 
 function loadResume(r) {
@@ -540,21 +594,25 @@ async function runDiagnose() {
       resume_id: selectedResumeId.value,
       jd_id: selectedJdId.value,
     })
+    historyLabels.value = null
     currentStep.value = 3
     maxStep.value = 3
     ElMessage.success('匹配诊断完成')
+    loadDiagnostics()
   } finally {
     diagnosing.value = false
   }
 }
 
 const usedResumeLabel = computed(() => {
+  if (historyLabels.value) return historyLabels.value.resume
   if (!selectedResumeId.value) return '最近一份简历'
   const r = resumes.value.find((x) => x.id === selectedResumeId.value)
   return r ? (r.name || `简历 #${r.id}`) : `简历 #${selectedResumeId.value}`
 })
 
 const usedJdLabel = computed(() => {
+  if (historyLabels.value) return historyLabels.value.jd
   if (selectedJdId.value) {
     const j = jds.value.find((x) => x.id === selectedJdId.value)
     return j ? j.title || '历史 JD' : `JD #${selectedJdId.value}`
@@ -577,6 +635,7 @@ function scoreText(s) {
 onMounted(() => {
   loadResumes()
   loadJds()
+  loadDiagnostics()
 })
 </script>
 

@@ -54,6 +54,38 @@
                 />
               </el-form-item>
             </el-form>
+
+            <template v-if="records.length">
+              <el-divider content-position="left">历史记录（{{ records.length }}）</el-divider>
+              <div class="history-list">
+                <div
+                  v-for="r in records"
+                  :key="r.id"
+                  class="history-item"
+                  @click="selectRecord(r)"
+                >
+                  <div class="history-main">
+                    <div class="history-route">
+                      {{ r.company }}
+                      <el-tag v-if="r.position" size="small" effect="plain">{{ r.position }}</el-tag>
+                      <el-tag
+                        v-if="r.review && r.review.overall_score"
+                        size="small"
+                        type="warning"
+                      >
+                        {{ r.review.overall_score }} 分
+                      </el-tag>
+                    </div>
+                    <div class="history-preview">
+                      {{ r.round_type || '未填轮次' }} · {{ r.interview_date || '未填日期' }}
+                    </div>
+                  </div>
+                  <el-button size="small" text type="danger" @click.stop="removeRecord(r)">
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- ② 问答录入 -->
@@ -98,13 +130,13 @@
             <el-button class="add-qa" @click="addItem">+ 添加一条问答</el-button>
           </section>
 
-          <!-- ③ 历史 + 保存 -->
+          <!-- ③ 确认保存 -->
           <section v-else key="s3" class="w-card">
             <div class="w-head">
               <span class="w-ico green"><el-icon :size="20"><Document /></el-icon></span>
               <div>
                 <div class="w-title">确认保存</div>
-                <div class="w-desc">保存后即可生成 AI 复盘，也可从历史记录直接打开</div>
+                <div class="w-desc">保存后即可生成 AI 复盘</div>
               </div>
             </div>
 
@@ -122,38 +154,6 @@
                 <b>{{ form.items.filter((i) => i.question.trim()).length }} 条</b>
               </span>
             </div>
-
-            <template v-if="records.length">
-              <div class="history-title">历史记录（{{ records.length }}）</div>
-              <div class="history-list">
-                <div
-                  v-for="r in records"
-                  :key="r.id"
-                  class="history-item"
-                  @click="selectRecord(r)"
-                >
-                  <div class="history-main">
-                    <div class="history-route">
-                      {{ r.company }}
-                      <el-tag v-if="r.position" size="small" effect="plain">{{ r.position }}</el-tag>
-                      <el-tag
-                        v-if="r.review && r.review.overall_score"
-                        size="small"
-                        type="warning"
-                      >
-                        {{ r.review.overall_score }} 分
-                      </el-tag>
-                    </div>
-                    <div class="history-preview">
-                      {{ r.round_type || '未填轮次' }} · {{ r.interview_date || '未填日期' }}
-                    </div>
-                  </div>
-                  <el-button size="small" text type="danger" @click.stop="removeRecord(r)">
-                    删除
-                  </el-button>
-                </div>
-              </div>
-            </template>
           </section>
         </transition>
       </div>
@@ -662,16 +662,12 @@ onMounted(() => {
 .sum-item b { color: var(--app-text); }
 
 /* 历史 */
-.history-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--app-text);
-  margin: 18px 0 10px;
-}
 .history-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
 }
 .history-item {
   display: flex;

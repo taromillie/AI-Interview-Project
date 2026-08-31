@@ -8,7 +8,12 @@ from app.core.db import get_db
 from app.core.rate_limit import limiter
 from app.models.resume import JobDescription, MatchDiagnostic, Resume
 from app.models.user import User
-from app.schemas.diagnostic import ResumeDiagnosticOut, ResumeDiagnosticRequest, ResumeOut
+from app.schemas.diagnostic import (
+    MatchDiagnosticOut,
+    ResumeDiagnosticOut,
+    ResumeDiagnosticRequest,
+    ResumeOut,
+)
 from app.services.llm_utils import require_llm
 from app.services.resume_matcher import run_diagnostic
 from app.services.resume_parser import extract_text_from_bytes, parse_resume
@@ -142,6 +147,41 @@ def list_resumes(
         .order_by(Resume.id.desc())
         .limit(20)
     ).all()
+
+
+@router.get("/diagnostics", response_model=list[MatchDiagnosticOut])
+def list_diagnostics(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """简历×JD 诊断历史记录（按时间倒序，最多 20 条，含完整缺口与建议）。"""
+    rows = db.scalars(
+        select(MatchDiagnostic)
+        .where(MatchDiagnostic.user_id == user.id)
+        .order_by(MatchDiagnostic.id.desc())
+        .limit(20)
+    ).all()
+    resume_ids = {d.resume_id for d in rows if d.resume_id is not None}
+    names: dict[int, str] = {}
+    if resume_ids:
+        names = dict(
+            db.execute(
+                select(Resume.id, Resume.name).where(Resume.id.in_(resume_ids))
+            ).all()
+        )
+    return [
+        {
+            "id": d.id,
+            "resume_id": d.resume_id,
+            "resume_name": names.get(d.resume_id, ""),
+            "jd_excerpt": (d.jd_text or "").strip()[:60],
+            "match_score": d.match_score,
+            "gaps": d.gaps or [],
+            "suggestions": d.suggestions or [],
+            "created_at": d.created_at,
+        }
+        for d in rows
+    ]
 
 
 @router.get("/{resume_id}", response_model=ResumeOut)

@@ -22,6 +22,18 @@ class ResumeDiagnosticOut(BaseModel):
     resume_suggestions: list[str]
 
 
+class MatchDiagnosticOut(BaseModel):
+    """历史诊断记录（列表即详情，前端可直接渲染报告）。"""
+    id: int
+    resume_id: int | None = None
+    resume_name: str = ""
+    jd_excerpt: str = ""
+    match_score: float = Field(ge=0, le=100)
+    gaps: list[GapItem]
+    suggestions: list[str]
+    created_at: object | None = None
+
+
 class ResumeOut(BaseModel):
     model_config = {"from_attributes": True}
 
