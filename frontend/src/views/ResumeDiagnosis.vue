@@ -129,7 +129,11 @@
                 v-for="d in diagnostics"
                 :key="d.id"
                 class="history-item"
+                tabindex="0"
+                role="button"
                 @click="openHistoryDiagnostic(d)"
+                @keydown.enter="openHistoryDiagnostic(d)"
+                @keydown.space.prevent="openHistoryDiagnostic(d)"
               >
                 <div class="history-main">
                   <div class="history-title">
@@ -170,7 +174,7 @@
             :rows="8"
             placeholder="粘贴目标岗位 JD 内容（至少 20 字），例如：招聘后端开发工程师，要求熟练掌握 Python、MySQL、FastAPI……"
           />
-          <el-button type="success" plain :loading="jdSaving" class="action" @click="saveJd">
+          <el-button type="primary" :loading="jdSaving" class="action" @click="saveJd">
             {{ editingJdId ? '保存修改' : '保存 JD' }}
           </el-button>
 
@@ -244,11 +248,17 @@
 
             <el-divider content-position="left">技能缺口（{{ result.gaps.length }}）</el-divider>
             <el-table :data="result.gaps" size="small" empty-text="没有硬性技能缺口，很棒！">
-              <el-table-column prop="skill" label="缺失技能" width="130" />
-              <el-table-column prop="required_level" label="要求程度" width="90" />
-              <el-table-column prop="current_level" label="当前状态" width="110" />
-              <el-table-column prop="suggestion" label="弥补建议" />
+              <el-table-column prop="skill" label="缺失技能" min-width="110" />
+              <el-table-column prop="required_level" label="要求程度" min-width="80" />
+              <el-table-column prop="current_level" label="当前状态" min-width="90" />
+              <el-table-column prop="suggestion" label="弥补建议" min-width="160" />
             </el-table>
+            <div class="gaps-actions">
+              <el-button type="primary" :icon="VideoPlay" :disabled="!result.gaps.length" @click="practiceGaps">
+                针对这些缺口练一场
+              </el-button>
+              <span class="gaps-actions-hint">将以上缺口作为练习主题，直接进入模拟面试</span>
+            </div>
 
             <el-divider content-position="left">简历优化建议</el-divider>
             <el-alert
@@ -294,6 +304,10 @@
         </el-button>
       </template>
       <template v-else>
+        <el-button size="large" @click="goHome">
+          <el-icon><ArrowLeft /></el-icon>
+          <span class="nav-text">返回</span>
+        </el-button>
         <el-button size="large" @click="goPrev">
           <el-icon><RefreshLeft /></el-icon>
           <span class="nav-text">换个 JD 重新诊断</span>
@@ -306,6 +320,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { formatDateTime } from '@/utils/time'
 import {
   ArrowLeft,
@@ -317,6 +332,7 @@ import {
   RefreshLeft,
   Search,
   UploadFilled,
+  VideoPlay,
 } from '@element-plus/icons-vue'
 import {
   createJd,
@@ -364,9 +380,29 @@ const maxStep = ref(1) // 到达过的最深步骤（决定步骤条"已完成"�
 
 const canDiagnose = computed(() => !!selectedJdId.value || jdText.value.trim().length >= 20)
 
+const router = useRouter()
+
+// 诊断 → 模拟面试：把技能缺口拼成练习主题，从基础难度练起
+function practiceGaps() {
+  const skills = (result.value?.gaps || []).map((g) => g.skill).filter(Boolean)
+  router.push({
+    name: 'interview',
+    query: {
+      target: skills.length ? skills.slice(0, 3).join('、').slice(0, 80) : undefined,
+      difficulty: 'easy',
+    },
+  })
+}
+
+// 结果页"返回"= 回到第一页（历史列表所在页）
+function goHome() {
+  currentStep.value = 1
+  historyLabels.value = null
+}
+
 function goPrev() {
   if (currentStep.value === 3 && result.value) {
-    // 结果页"返回"= 回 JD 步骤重新调整
+    // 结果页"上一步"= 回 JD 步骤重新调整
     currentStep.value = 2
     return
   }
@@ -403,7 +439,7 @@ async function loadResumes() {
   try {
     resumes.value = await listResumes()
   } catch {
-    /* 忽略 */
+    /* 拦截器已统一提示 */
   }
 }
 
@@ -411,7 +447,7 @@ async function loadJds() {
   try {
     jds.value = await listJds()
   } catch {
-    /* 忽略 */
+    /* 拦截器已统一提示 */
   }
 }
 
@@ -419,7 +455,7 @@ async function loadDiagnostics() {
   try {
     diagnostics.value = await listDiagnostics()
   } catch {
-    /* 忽略 */
+    /* 拦截器已统一提示 */
   }
 }
 
@@ -577,8 +613,8 @@ async function confirmDeleteResume(r) {
       file.value = null
     }
     await loadResumes()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '删除失败')
+  } catch {
+    /* 拦截器已统一提示 */
   }
 }
 
@@ -839,11 +875,21 @@ onMounted(() => {
 }
 .score-hint {
   margin-top: 8px;
-  color: #909399;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 .suggestion {
   margin-bottom: 8px;
+}
+.gaps-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.gaps-actions-hint {
+  color: var(--app-text-muted);
+  font-size: 12px;
 }
 .used-row {
   display: flex;
@@ -853,7 +899,7 @@ onMounted(() => {
 }
 .used-label {
   font-size: 13px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 .used-arrow {
   color: #c0c4cc;
@@ -900,7 +946,7 @@ onMounted(() => {
 }
 .history-meta {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
   margin-top: 4px;
 }
 .history-skills {
@@ -911,12 +957,12 @@ onMounted(() => {
 }
 .history-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
   margin-top: 4px;
 }
 .history-preview {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
   margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -925,7 +971,7 @@ onMounted(() => {
 }
 .more {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 
 /* ==================== 深色液态玻璃覆盖 ==================== */

@@ -31,6 +31,7 @@ const routes = [
       { path: 'offer', name: 'offer', component: () => import('@/views/OfferCompare.vue') },
       { path: 'questions', name: 'questions', component: () => import('@/views/QuestionBank.vue') },
       { path: 'providers', name: 'providers', component: () => import('@/views/ProviderConfig.vue') },
+      { path: 'resume-match', name: 'resume-match', component: () => import('@/views/ResumeMatch.vue') },
     ],
   },
 ]

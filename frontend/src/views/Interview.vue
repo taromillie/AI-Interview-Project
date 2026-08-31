@@ -627,8 +627,8 @@ async function createSession() {
     if (answerMode.value === 'video') {
       await enableCamera()
     }
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '创建面试失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     creating.value = false
   }
@@ -938,7 +938,7 @@ function scrollToBottom() {
   })
 }
 
-// 从岗位广场 / 首页跳转时带入岗位
+// 从岗位广场 / 诊断结果 / 面试历史跳转时带入岗位与难度
 function applyQueryParams() {
   const pid = Number(route.query.position_id)
   if (pid && positions.value.some((x) => x.id === pid)) {
@@ -949,6 +949,10 @@ function applyQueryParams() {
   if (t) {
     positionMode.value = 'custom'
     customPosition.value = String(t)
+  }
+  const d = route.query.difficulty
+  if (d && ['easy', 'normal', 'hard'].includes(d)) {
+    selectedDifficulty.value = d
   }
 }
 
@@ -1031,8 +1035,8 @@ async function resumeInterview(id) {
     }
     // 语音/视频模式：恢复后自动开麦，直接开口即可
     maybeAutoStartMic()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '恢复面试失败')
+  } catch {
+    /* 拦截器已统一提示 */
   }
 }
 </script>
@@ -1201,9 +1205,9 @@ async function resumeInterview(id) {
 /* ── 表单 ── */
 .full { width: 100%; }
 .mode-group { margin-bottom: 4px; }
-.opt-company { color: #303133; font-weight: 600; font-size: 13px; }
-.opt-position { margin-left: 8px; color: #909399; font-size: 12px; }
-.opt-meta { float: right; color: #c0c4cc; font-size: 12px; }
+.opt-company { color: var(--app-text); font-weight: 600; font-size: 13px; }
+.opt-position { margin-left: 8px; color: var(--app-text-muted); font-size: 12px; }
+.opt-meta { float: right; color: var(--app-text-muted); font-size: 12px; }
 
 /* ── 面试官卡片 ── */
 .interviewer-grid {

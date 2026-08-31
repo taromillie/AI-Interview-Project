@@ -1,5 +1,29 @@
 <template>
   <div class="dashboard">
+    <!-- 新手引导：三步上手 -->
+    <section v-if="showGuide" class="guide">
+      <div class="guide-head">
+        <div>
+          <div class="guide-title">欢迎使用 AI 面试官</div>
+          <div class="guide-desc">只需三步，15 分钟跑通「诊断 → 面试 → 复盘」全流程</div>
+        </div>
+        <button class="guide-close" aria-label="关闭引导" @click="closeGuide">
+          <el-icon><Close /></el-icon>
+        </button>
+      </div>
+      <div class="guide-steps">
+        <div v-for="(s, i) in guideSteps" :key="s.path" class="guide-step">
+          <span class="guide-step-num">{{ i + 1 }}</span>
+          <el-icon class="guide-step-ico" :size="18"><component :is="s.icon" /></el-icon>
+          <div class="guide-step-body">
+            <div class="guide-step-title">{{ s.title }}</div>
+            <div class="guide-step-desc">{{ s.desc }}</div>
+          </div>
+          <button class="guide-step-btn" @click="go(s.path)">去完成</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Hero：对话式入口 -->
     <section class="hero">
       <h1 class="hero-title">你的 AI 面试官</h1>
@@ -42,7 +66,16 @@
         <button class="more" @click="go('/jobs')">查看全部 <el-icon><ArrowRight /></el-icon></button>
       </div>
       <div class="job-grid">
-        <div v-for="j in hotJobs" :key="j.id" class="job-card" @click="startByJob(j)">
+        <div
+          v-for="j in hotJobs"
+          :key="j.id"
+          class="job-card"
+          tabindex="0"
+          role="button"
+          @click="startByJob(j)"
+          @keydown.enter="startByJob(j)"
+          @keydown.space.prevent="startByJob(j)"
+        >
           <div class="job-name">{{ j.company || j.name }}</div>
           <div class="job-position">{{ j.name }}</div>
           <div class="job-meta">
@@ -82,18 +115,34 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
+  Close,
   Compass,
+  DataAnalysis,
   Document,
   Grid,
   Money,
+  VideoPlay,
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { listPositions } from '@/api/question'
+import { listInterviews } from '@/api/interview'
 
 const router = useRouter()
 const userStore = useUserStore()
 const target = ref('')
 const hotJobs = ref([])
+
+// ── 新手引导：无任何面试记录时展示，可手动关闭 ──
+const showGuide = ref(false)
+const guideSteps = [
+  { path: '/diagnosis', icon: Document, title: '诊断简历', desc: '上传简历 + JD，定位技能缺口' },
+  { path: '/interview', icon: VideoPlay, title: '模拟面试', desc: '选个岗位，来一场真实感 AI 面试' },
+  { path: '/history', icon: DataAnalysis, title: '复盘报告', desc: '四维评分与逐题批改，越面越强' },
+]
+function closeGuide() {
+  showGuide.value = false
+  localStorage.setItem('guide_closed', '1')
+}
 
 const chips = [
   { text: '我想面字节的 AI 产品经理', target: '字节 AI 产品经理' },
@@ -157,6 +206,15 @@ const fallbackJobs = [
 ]
 
 onMounted(async () => {
+  // 新用户引导：从未做过面试且未手动关闭时展示
+  try {
+    const interviews = await listInterviews()
+    if (!interviews.length && !localStorage.getItem('guide_closed')) {
+      showGuide.value = true
+    }
+  } catch {
+    /* 拦截器已统一提示 */
+  }
   try {
     const list = await listPositions()
     const active = list.filter((x) => x.status === 'active')
@@ -178,6 +236,108 @@ onMounted(async () => {
 .dashboard {
   max-width: 1000px;
   margin: 0 auto;
+}
+
+/* ---------- 新手引导 ---------- */
+.guide {
+  margin-bottom: 26px;
+  padding: 20px 22px 18px;
+  border: 1px solid rgba(90, 208, 230, 0.28);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(90, 208, 230, 0.1), rgba(56, 189, 248, 0.04));
+}
+.guide-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.guide-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+.guide-desc {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+.guide-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--app-text-muted);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.guide-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--app-text);
+}
+.guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+.guide-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.guide-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--app-cyan);
+  color: #062a3a;
+  font-size: 12px;
+  font-weight: 700;
+}
+.guide-step-ico {
+  color: var(--app-cyan);
+  flex: none;
+}
+.guide-step-body {
+  flex: 1;
+  min-width: 0;
+}
+.guide-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+.guide-step-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--app-text-muted);
+  line-height: 1.4;
+}
+.guide-step-btn {
+  flex: none;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(90, 208, 230, 0.15);
+  color: var(--app-cyan);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.guide-step-btn:hover {
+  background: rgba(90, 208, 230, 0.28);
 }
 
 /* ---------- Hero ---------- */

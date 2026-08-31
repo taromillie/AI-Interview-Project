@@ -74,7 +74,7 @@ function isBest(row, i) {
 .best-hint {
   margin-top: 8px;
   font-size: 12px;
-  color: #c0c4cc;
+  color: var(--app-text-muted);
 }
 .section-title {
   font-size: 14px;

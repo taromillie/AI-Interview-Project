@@ -241,6 +241,7 @@ import {
 } from '@/api/offer'
 import CompareResult from '@/components/offer/CompareResult.vue'
 import WizardStepper from '@/components/wizard/WizardStepper.vue'
+import { formatDateTime } from '@/utils/time'
 
 const commonCities = ['北京', '上海', '深圳', '广州', '杭州', '成都', '武汉', '南京', '苏州', '西安']
 
@@ -330,7 +331,7 @@ async function loadOffers() {
     const valid = new Set(offers.value.map((o) => o.id))
     selectedIds.value = selectedIds.value.filter((id) => valid.has(id))
   } catch {
-    /* 忽略 */
+    /* 拦截器已统一提示 */
   }
 }
 
@@ -368,7 +369,8 @@ async function removeHistory(id) {
 
 function formatTime(t) {
   if (!t) return ''
-  return new Date(t).toLocaleString('zh-CN', { hour12: false })
+  // 后端统一存 UTC naive 时间，走 utils/time 的 UTC 修正，避免本地时区差 8 小时
+  return formatDateTime(t)
 }
 
 async function saveOffer() {
@@ -691,7 +693,7 @@ onMounted(() => {
 }
 .history-time {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 .history-item {
   display: flex;

@@ -277,7 +277,8 @@ const PAD_L = 44
 const PAD_R = 18
 const PAD_T = 16
 const PAD_B = 30
-const TREND_COLORS = { tech: '#1a1a1a', expression: '#3a3a3a', logic: '#059669', project: '#d97706' }
+// 趋势线配色：与深色主题匹配的高亮色；内联 :stroke 直接绑定，不依赖 DOM 顺序
+const TREND_COLORS = { tech: '#22d3ee', expression: '#60a5fa', logic: '#34d399', project: '#fbbf24' }
 
 function tx(i) {
   const n = (profile.value.trend || []).length
@@ -340,6 +341,7 @@ onMounted(load)
   display: flex;
   justify-content: center;
   padding: 8px 0;
+  overflow-x: auto;
 }
 .radar {
   max-width: 420px;
@@ -487,6 +489,7 @@ onMounted(load)
 }
 .trend-wrap {
   padding: 4px 0;
+  overflow-x: auto;
 }
 .trend {
   width: 100%;
@@ -498,19 +501,9 @@ onMounted(load)
 .trend line {
   stroke: rgba(255, 255, 255, 0.1);
 }
-/* 趋势折线：主题化配色（固定 dims 顺序 tech/expression/logic/project） */
+/* 趋势折线：颜色由 :stroke="TREND_COLORS[key]" 内联指定 */
 .trend > path {
-  stroke: var(--app-cyan);
   stroke-width: 2.5;
-}
-.trend > path:nth-child(10) {
-  stroke: #8aa2ff;
-}
-.trend > path:nth-child(11) {
-  stroke: var(--app-success);
-}
-.trend > path:nth-child(12) {
-  stroke: var(--app-warning);
 }
 /* 趋势数据点 */
 .trend circle {

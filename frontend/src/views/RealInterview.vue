@@ -385,7 +385,9 @@ function goStep(n) {
 async function loadRecords() {
   try {
     records.value = await listRealInterviews()
-  } catch { /* 忽略 */ }
+  } catch {
+    /* 拦截器已统一提示 */
+  }
 }
 
 async function saveInterview() {
@@ -410,7 +412,9 @@ async function saveInterview() {
 async function selectRecord(r) {
   try {
     current.value = await getRealInterview(r.id)
-  } catch { /* 忽略 */ }
+  } catch {
+    /* 拦截器已统一提示 */
+  }
 }
 
 async function runReview() {
@@ -420,8 +424,8 @@ async function runReview() {
     current.value = await reviewRealInterview(current.value.id)
     ElMessage.success('AI 复盘完成')
     await loadRecords()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '复盘生成失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     reviewing.value = false
   }

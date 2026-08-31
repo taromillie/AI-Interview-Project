@@ -129,8 +129,8 @@ async function onLogin() {
     userStore.setProfile(me)
     ElMessage.success('欢迎回来，' + me.username)
     router.push({ name: 'dashboard' })
-  } catch (e) {
-    ElMessage.error(e.message || '登录失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     loading.value = false
   }
@@ -158,8 +158,8 @@ async function onRegister() {
     userStore.setProfile(me)
     ElMessage.success('注册成功，欢迎加入')
     router.push({ name: 'dashboard' })
-  } catch (e) {
-    ElMessage.error(e.message || '注册失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     loading.value = false
   }

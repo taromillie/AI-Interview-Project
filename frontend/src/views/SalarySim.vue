@@ -173,6 +173,10 @@
           <span class="route-sub">{{ result.years || years }} 年经验</span>
         </div>
         <div class="result-actions">
+          <el-button size="small" @click="reset">
+            <el-icon class="el-icon--left"><ArrowLeft /></el-icon>
+            返回
+          </el-button>
           <el-tag v-if="result.id" size="small" type="warning" effect="light">历史记录</el-tag>
           <el-tag v-else size="small" type="success" effect="light">本次评估</el-tag>
           <el-tag v-if="combinedResume" size="small" effect="plain">已结合简历</el-tag>
@@ -252,14 +256,14 @@ import { listResumes } from '@/api/diagnostic'
 import { listSalaryEvals, salaryEvaluate } from '@/api/salary'
 import { formatDateTime } from '@/utils/time'
 import WizardStepper from '@/components/wizard/WizardStepper.vue'
+import { useWizard } from '@/composables/useWizard'
 
 const wizardSteps = [
   { id: 1, title: '岗位城市' },
   { id: 2, title: '技能年限' },
   { id: 3, title: '简历确认' },
 ]
-const currentStep = ref(1)
-const maxStep = ref(1)
+const { currentStep, maxStep, goNext: stepNext, goPrev } = useWizard(1, 3)
 
 const targetPosition = ref('')
 const skillStack = ref([])
@@ -293,14 +297,7 @@ function goNext() {
     ElMessage.warning('请填写目标岗位与城市')
     return
   }
-  if (currentStep.value < 3) {
-    currentStep.value++
-    maxStep.value = Math.max(maxStep.value, currentStep.value)
-  }
-}
-
-function goPrev() {
-  if (currentStep.value > 1) currentStep.value--
+  stepNext()
 }
 
 function goStep(n) {
@@ -320,7 +317,9 @@ function reset() {
 async function loadEvals() {
   try {
     evals.value = await listSalaryEvals()
-  } catch { /* 忽略 */ }
+  } catch {
+    /* 拦截器已统一提示 */
+  }
 }
 
 function loadEval(e) {
@@ -352,8 +351,8 @@ async function runEvaluate() {
     })
     ElMessage.success('谈薪评估完成')
     await loadEvals()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '评估失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     evaluating.value = false
   }
@@ -362,7 +361,9 @@ async function runEvaluate() {
 async function loadResumes() {
   try {
     resumes.value = await listResumes()
-  } catch { /* 忽略 */ }
+  } catch {
+    /* 拦截器已统一提示 */
+  }
 }
 
 function formatMoney(v) {
@@ -592,7 +593,7 @@ onMounted(() => {
 }
 .history-time {
   font-size: 12px;
-  color: #c0c4cc;
+  color: var(--app-text-muted);
   flex-shrink: 0;
 }
 

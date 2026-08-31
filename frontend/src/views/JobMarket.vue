@@ -27,7 +27,16 @@
 
     <!-- ============ 视图一：岗位方向卡 ============ -->
     <div v-if="view === 'grid'" class="direction-grid">
-      <div v-for="d in directions" :key="d.key" class="direction-card" @click="openDirection(d)">
+      <div
+        v-for="d in directions"
+        :key="d.key"
+        class="direction-card"
+        tabindex="0"
+        role="button"
+        @click="openDirection(d)"
+        @keydown.enter="openDirection(d)"
+        @keydown.space.prevent="openDirection(d)"
+      >
         <div class="dir-head">
           <div class="dir-name">{{ d.name }}</div>
           <div class="dir-count">{{ d.count }} 家公司</div>
@@ -109,7 +118,16 @@
 
       <!-- 岗位卡片网格 -->
       <div v-if="filtered.length" class="job-grid">
-        <div v-for="j in filtered" :key="j.id" class="job-card" @click="openDetail(j)">
+        <div
+          v-for="j in filtered"
+          :key="j.id"
+          class="job-card"
+          tabindex="0"
+          role="button"
+          @click="openDetail(j)"
+          @keydown.enter="openDetail(j)"
+          @keydown.space.prevent="openDetail(j)"
+        >
           <div class="job-head">
             <div class="job-name-row">
               <div class="job-name">{{ j.company || '未标注公司' }}</div>
@@ -123,8 +141,8 @@
               </button>
             </div>
             <div class="job-tags">
-              <el-tag v-if="appStatus(j.id)" size="small" :type="APPLICATION_STATUS[appStatus(j.id)].type" effect="dark">
-                {{ APPLICATION_STATUS[appStatus(j.id)].label }}
+              <el-tag v-if="appMeta(j.id)" size="small" :type="appMeta(j.id).type" effect="dark">
+                {{ appMeta(j.id).label }}
               </el-tag>
               <el-tag size="small" :type="difficultyType(j.difficulty)" effect="light">
                 {{ difficultyText(j.difficulty) }}
@@ -241,6 +259,10 @@
               </span>
             </div>
             <div class="modal-actions">
+              <button class="fav-btn text-btn" @click="goPlan(detail)">
+                <el-icon :size="15"><Notebook /></el-icon>
+                加入备战计划
+              </button>
               <button
                 class="fav-btn text-btn"
                 :class="{ on: isFav(detail.id) }"
@@ -251,7 +273,7 @@
               </button>
               <el-dropdown @command="(c) => setAppStatus(detail, c)">
                 <button class="apply-btn" :class="appStatus(detail.id) ? 'st-' + appStatus(detail.id) : ''">
-                  {{ appStatus(detail.id) ? APPLICATION_STATUS[appStatus(detail.id)].label : '标记投递状态' }}
+                  {{ appMeta(detail.id) ? appMeta(detail.id).label : '标记投递状态' }}
                   <el-icon :size="12"><ArrowDown /></el-icon>
                 </button>
                 <template #dropdown>
@@ -285,7 +307,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowDown, ArrowLeft, ArrowRight, Check, Clock, Close, Link, Location, MagicStick, Refresh, Search, Star, StarFilled, Wallet } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowRight, Check, Clock, Close, Link, Location, MagicStick, Notebook, Refresh, Search, Star, StarFilled, Wallet } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getJobTrackSummary, favoritePosition, unfavoritePosition, setApplication, removeApplication, APPLICATION_STATUS } from '@/api/jobTrack'
 import { listDirections, syncPositions, getSyncConfig, updateSyncConfig } from '@/api/question'
@@ -376,7 +398,15 @@ function fmtDate(v) {
   return formatDate(v)
 }
 
-function applyFilter() {}
+function applyFilter() {
+  // 筛选已由 filtered 计算属性实时生效，回车聚焦到结果区并给出反馈
+  if (!filtered.value.length) {
+    ElMessage.info(keyword.value.trim() ? '没有符合条件的岗位，试试更换关键词或调整筛选' : '当前没有可展示的岗位')
+    return
+  }
+  const grid = document.querySelector('.job-grid')
+  if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 // ── 视图切换 ──
 function openDirection(d) {
@@ -397,6 +427,17 @@ function backToGrid() {
 // ── 收藏与投递跟踪 ──
 const isFav = (id) => favoriteIds.value.has(id)
 const appStatus = (id) => (applicationMap.value[id] ? applicationMap.value[id].status : '')
+// 安全取状态元信息：后端返回未知状态值时回退为 null，避免取 label 时抛错白屏
+const appMeta = (id) => {
+  const st = appStatus(id)
+  return st && APPLICATION_STATUS[st] ? APPLICATION_STATUS[st] : null
+}
+
+// 岗位 → 备战计划：带 position_id 一键跳转（后端据此回填目标岗位与技能）
+function goPlan(p) {
+  detail.value = null
+  router.push({ name: 'study-plan', query: { position_id: p.id } })
+}
 
 async function loadTrack() {
   try {
@@ -478,6 +519,8 @@ async function onAutoIntervalChange() {
       autoInterval.value > 0 ? `已开启自动更新，每 ${autoInterval.value} 分钟同步一次` : '已切换为仅手动更新'
     )
     await loadSyncConfig()
+    if (autoInterval.value > 0) startPolling()
+    else stopPolling()
   } catch {
     ElMessage.warning('更新同步频率失败')
   }
@@ -494,13 +537,24 @@ async function loadData() {
 
 function startPolling() {
   if (pollTimer) return
+  // 用户选择「仅手动更新」时不轮询
+  if (autoInterval.value <= 0) return
   pollTimer = setInterval(async () => {
+    // 页面切到后台时不空跑请求
+    if (document.visibilityState !== 'visible') return
     try {
       await Promise.all([loadData(), loadSyncConfig()])
     } catch {
       /* 静默失败，下轮重试 */
     }
   }, 60000)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
 }
 
 function openDetail(j) {
@@ -541,14 +595,9 @@ async function handleSync() {
 }
 
 onMounted(async () => {
-  try {
-    await loadData()
-  } catch {
-    /* 忽略 */
-  } finally {
-    loading.value = false
-  }
-  loadSyncConfig()
+  await loadData()
+  loading.value = false
+  await loadSyncConfig()
   loadTrack()
   startPolling()
 })

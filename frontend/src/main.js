@@ -36,4 +36,16 @@ for (const name of iconNames) {
 app.use(createPinia())
 app.use(router)
 
+// 全局兜底：渲染/异步异常不再静默白屏，统一提示并留痕
+let lastErrorAt = 0
+function reportGlobalError(err) {
+  console.error('[App] unhandled error:', err)
+  const now = Date.now()
+  if (now - lastErrorAt < 2000) return
+  lastErrorAt = now
+  ElMessage.error('页面发生异常，请刷新重试')
+}
+app.config.errorHandler = (err) => reportGlobalError(err)
+window.addEventListener('unhandledrejection', (e) => reportGlobalError(e.reason))
+
 app.mount('#app')

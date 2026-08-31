@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.api.deps import get_current_user
 from app.core.db import get_db
@@ -79,12 +80,13 @@ def update_plan(
     if not updated and payload.done:
         tasks.append({"day": payload.day, "done": True, "title": "", "description": "", "topics": []})
     plan.tasks = tasks
+    # JSON 列的嵌套变更 SQLAlchemy 无法自动追踪，需显式标记后再 commit
+    flag_modified(plan, "tasks")
     if tasks and all(t.get("done") for t in tasks):
         plan.status = "completed"
     else:
         plan.status = "active"
     db.commit()
-    db.refresh(plan)
     return plan
 
 

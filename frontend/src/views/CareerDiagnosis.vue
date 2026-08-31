@@ -175,6 +175,10 @@
           <span class="route-to">{{ result.to_position }}</span>
         </div>
         <div class="result-actions">
+          <el-button size="small" @click="reset">
+            <el-icon class="el-icon--left"><ArrowLeft /></el-icon>
+            返回
+          </el-button>
           <el-tag v-if="result.id" size="small" type="warning" effect="light">历史记录</el-tag>
           <el-tag v-else size="small" type="success" effect="light">本次诊断</el-tag>
           <el-button size="small" @click="reset">
@@ -364,8 +368,8 @@ async function runDiagnosis() {
     })
     ElMessage.success('转行诊断完成')
     await loadPlans()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '诊断失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     diagnosing.value = false
   }
@@ -660,7 +664,7 @@ onMounted(() => {
 }
 .history-time {
   font-size: 12px;
-  color: #c0c4cc;
+  color: var(--app-text-muted);
   flex-shrink: 0;
 }
 

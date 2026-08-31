@@ -11,6 +11,14 @@
         </div>
       </div>
       <div class="banner-actions">
+        <el-button plain @click="goBack">
+          <el-icon style="margin-right: 4px"><ArrowLeft /></el-icon>
+          返回
+        </el-button>
+        <el-button plain @click="goPlan">
+          <el-icon style="margin-right: 4px"><Notebook /></el-icon>
+          加入备战计划
+        </el-button>
         <el-button type="primary" @click="router.push({ name: 'interview' })">
           <el-icon style="margin-right: 4px"><Plus /></el-icon>
           再来一场面试
@@ -165,9 +173,10 @@
 </template>
 
 <script setup>
-import { DataAnalysis, Plus, Pointer } from '@element-plus/icons-vue'
+import { ArrowLeft, DataAnalysis, Notebook, Plus, Pointer } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getReport } from '@/api/report'
 
 const route = useRoute()
@@ -181,11 +190,28 @@ const PENDING_SUMMARY = '报告生成中，请稍后刷新查看…'
 const loading = ref(false)
 const report = ref(null)
 let pollTimer = null
+// 轮询上限与退避：最多轮询 24 次（约 1 分钟）；连续失败时翻倍间隔，最多 20s
+const POLL_MAX_ATTEMPTS = 24
+let pollAttempts = 0
+let pollFailures = 0
+let pollDelayMs = 2500
 
 const isGenerating = computed(() => report.value?.summary === PENDING_SUMMARY)
 
 function goPractice(knowledge) {
   router.push({ name: 'questions', query: { keyword: knowledge } })
+}
+
+// 报告 → 备战计划：把本场弱项带过去，作为备战重点提示
+function goPlan() {
+  const skills = (report.value?.weak_points || []).join('、')
+  router.push({ name: 'study-plan', query: skills ? { skills } : {} })
+}
+
+// 返回：优先回到来处，无跳转历史时兜底到面试记录列表
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else router.push({ name: 'history' })
 }
 
 function scoreColor(s) {
@@ -209,6 +235,7 @@ async function load() {
     }
   } catch {
     report.value = null
+    /* 拦截器已统一提示 */
   } finally {
     loading.value = false
   }
@@ -216,25 +243,46 @@ async function load() {
 
 function startPolling(id) {
   if (pollTimer) return
-  pollTimer = setInterval(async () => {
-    try {
-      const r = await getReport(id)
-      if (r?.summary !== PENDING_SUMMARY) {
-        report.value = r
-        clearInterval(pollTimer)
-        pollTimer = null
-      }
-    } catch {
-      // 瞬时网络错误忽略，继续轮询
+  pollAttempts = 0
+  pollFailures = 0
+  pollDelayMs = 2500
+  pollTimer = setTimeout(async () => pollTick(id), pollDelayMs)
+}
+
+async function pollTick(id) {
+  pollAttempts++
+  try {
+    const r = await getReport(id)
+    pollFailures = 0
+    pollDelayMs = 2500
+    if (r?.summary !== PENDING_SUMMARY) {
+      report.value = r
+      pollTimer = null
+      return
     }
-  }, 2500)
+  } catch {
+    // 连续失败退避：2.5s → 5s → 10s → 20s 封顶
+    pollFailures++
+    pollDelayMs = Math.min(pollDelayMs * 2, 20000)
+    if (pollFailures >= 5) {
+      pollTimer = null
+      ElMessage.error('报告生成状态获取失败，请刷新页面重试')
+      return
+    }
+  }
+  if (pollAttempts >= POLL_MAX_ATTEMPTS) {
+    pollTimer = null
+    ElMessage.warning('报告仍在后台生成中，可稍后重进本页查看')
+    return
+  }
+  pollTimer = setTimeout(() => pollTick(id), pollDelayMs)
 }
 
 onMounted(load)
 
 onUnmounted(() => {
   if (pollTimer) {
-    clearInterval(pollTimer)
+    clearTimeout(pollTimer)
     pollTimer = null
   }
 })

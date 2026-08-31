@@ -219,7 +219,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowRight,
   Check,
@@ -236,6 +236,7 @@ import { listResumeMatches, matchPositions } from '@/api/match'
 import { formatDateTime } from '@/utils/time'
 
 const router = useRouter()
+const route = useRoute()
 
 const resumes = ref([])
 const selectedId = ref(null)
@@ -356,8 +357,13 @@ function openDetail(item) {
   detail.value = item
 }
 
-// 初始加载简历列表
-loadResumes()
+// 初始加载简历列表；支持从诊断页带 resume_id 跳入并自动选中
+loadResumes().then(() => {
+  const rid = route.query.resume_id
+  if (!rid) return
+  const r = resumes.value.find((x) => String(x.id) === String(rid))
+  if (r) selectResume(r)
+})
 </script>
 
 <style scoped>

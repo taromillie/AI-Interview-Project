@@ -427,6 +427,42 @@ html .el-table--border::after {
   background-color: transparent;
 }
 
+/* Alert 深色玻璃化（覆盖 Element 默认浅色底，避免全站白块突兀） */
+html .el-alert {
+  --el-alert-bg-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  color: var(--el-text-color-regular);
+}
+html .el-alert--success {
+  background: rgba(67, 217, 163, 0.08);
+  border-color: rgba(67, 217, 163, 0.35);
+}
+html .el-alert--info {
+  background: rgba(90, 208, 230, 0.08);
+  border-color: rgba(90, 208, 230, 0.35);
+}
+html .el-alert--warning {
+  background: rgba(242, 193, 78, 0.08);
+  border-color: rgba(242, 193, 78, 0.35);
+}
+html .el-alert--error {
+  background: rgba(255, 107, 107, 0.08);
+  border-color: rgba(255, 107, 107, 0.35);
+}
+html .el-alert--success .el-alert__icon {
+  color: var(--app-success);
+}
+html .el-alert--info .el-alert__icon {
+  color: var(--app-cyan);
+}
+html .el-alert--warning .el-alert__icon {
+  color: var(--app-warning);
+}
+html .el-alert__title {
+  color: var(--el-text-color-primary);
+}
+
 /* 分隔线 */
 html .el-divider {
   border-color: rgba(255, 255, 255, 0.12);
@@ -707,6 +743,58 @@ html .el-skeleton__item {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ==================== 可访问性：键盘焦点可见 ==================== */
+:focus-visible {
+  outline: 2px solid var(--app-cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+[tabindex]:focus-visible {
+  outline: 2px solid var(--app-cyan);
+  outline-offset: 2px;
+}
+
+/* ==================== 响应式（通用） ==================== */
+@media (max-width: 900px) {
+  .page-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px;
+    gap: 14px;
+  }
+  .banner-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .banner-title {
+    font-size: 18px;
+  }
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  /* 宽表格在窄屏下允许横向滚动，不撑破页面 */
+  .el-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .page-banner {
+    padding: 14px;
+  }
+  .banner-left {
+    gap: 10px;
+  }
+  .banner-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 19px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

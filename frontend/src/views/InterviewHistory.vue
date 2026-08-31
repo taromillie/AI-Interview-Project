@@ -14,7 +14,16 @@
     <div v-loading="loading" class="list-wrap">
       <el-empty v-if="!loading && !interviews.length" description="还没有面试记录，去完成一场模拟面试吧" />
       <div v-else class="cards">
-        <div v-for="it in interviews" :key="it.id" class="card" @click="openDetail(it)">
+        <div
+          v-for="it in interviews"
+          :key="it.id"
+          class="card"
+          tabindex="0"
+          role="button"
+          @click="openDetail(it)"
+          @keydown.enter="openDetail(it)"
+          @keydown.space.prevent="openDetail(it)"
+        >
           <div class="card-main">
             <div class="card-title">
               {{ it.position_name || it.target_position || '未指定岗位' }}
@@ -49,6 +58,7 @@
             </el-button>
             <el-button size="small" type="primary" plain @click.stop="openDetail(it)">查看</el-button>
             <el-button v-if="it.report_id" size="small" @click.stop="goReport(it.report_id)">复盘报告</el-button>
+            <el-button size="small" :icon="RefreshLeft" @click.stop="retry(it)">同岗位再练</el-button>
           </div>
         </div>
       </div>
@@ -151,7 +161,7 @@
 </template>
 
 <script setup>
-import { Plus, Tickets } from '@element-plus/icons-vue'
+import { Plus, RefreshLeft, Tickets } from '@element-plus/icons-vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -218,8 +228,8 @@ async function load() {
   loading.value = true
   try {
     interviews.value = await listInterviews()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '加载失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     loading.value = false
   }
@@ -231,8 +241,8 @@ async function openDetail(it) {
   detail.value = null
   try {
     detail.value = await getInterviewDetail(it.id)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '加载详情失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     loadingDetail.value = false
   }
@@ -241,6 +251,19 @@ async function openDetail(it) {
 function goReport(reportId) {
   drawer.value = false
   router.push({ name: 'report', params: { id: reportId } })
+}
+
+// 面试历史 → 模拟面试：同岗位同难度再练一场
+function retry(it) {
+  drawer.value = false
+  router.push({
+    name: 'interview',
+    query: {
+      ...(it.position_id ? { position_id: it.position_id } : {}),
+      ...(it.difficulty ? { difficulty: it.difficulty } : {}),
+      ...(it.target_position ? { target: it.target_position } : {}),
+    },
+  })
 }
 
 // 继续进行中的面试（中断恢复）

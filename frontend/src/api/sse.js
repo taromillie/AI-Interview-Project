@@ -1,32 +1,10 @@
-// SSE POST 客户端：EventSource 不支持 POST，改用 fetch + ReadableStream 解析。
+// SSE 客户端：EventSource 不支持 POST 与自定义 Header，统一用 fetch + ReadableStream 解析。
 // 用法：
-//   await postSSE('/interviews/1/start', {}, {
-//     onEvent: (event, data) => { ... },
-//   })
+//   await postSSE('/interviews/1/start', {}, { onEvent: (event, data) => {} })
+//   await getSSE('/offers/compare/history/1/stream', { onEvent: (event, data) => {} })
+// 两套实现（POST / GET）共用 readSSE 解析器，避免行为分叉。
 
-export async function postSSE(url, body = {}, { onEvent, signal } = {}) {
-  const token = localStorage.getItem('token')
-  const resp = await fetch(`/api${url}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: token ? `Bearer ${token}` : '',
-    },
-    body: JSON.stringify(body),
-    signal,
-  })
-
-  if (!resp.ok) {
-    let detail = `请求失败（${resp.status}）`
-    try {
-      const data = await resp.json()
-      detail = data.detail || detail
-    } catch {
-      /* 保持默认错误信息 */
-    }
-    throw new Error(detail)
-  }
-
+async function readSSE(resp, onEvent) {
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -63,4 +41,54 @@ export async function postSSE(url, body = {}, { onEvent, signal } = {}) {
       match = buffer.match(splitter)
     }
   }
+}
+
+async function authHeaders() {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export async function postSSE(url, body = {}, { onEvent, signal } = {}) {
+  const resp = await fetch(`/api${url}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await authHeaders()),
+    },
+    body: JSON.stringify(body),
+    signal,
+  })
+
+  if (!resp.ok) {
+    let detail = `请求失败（${resp.status}）`
+    try {
+      const data = await resp.json()
+      detail = data.detail || detail
+    } catch {
+      /* 保持默认错误信息 */
+    }
+    throw new Error(detail)
+  }
+
+  await readSSE(resp, onEvent)
+}
+
+export async function getSSE(url, { onEvent, signal } = {}) {
+  const resp = await fetch(`/api${url}`, {
+    headers: await authHeaders(),
+    signal,
+  })
+
+  if (!resp.ok) {
+    let detail = `请求失败（${resp.status}）`
+    try {
+      const data = await resp.json()
+      detail = data.detail || detail
+    } catch {
+      /* 保持默认错误信息 */
+    }
+    throw new Error(detail)
+  }
+
+  await readSSE(resp, onEvent)
 }

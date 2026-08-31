@@ -40,6 +40,10 @@
                 <div class="w-desc">计划将围绕该岗位的核心知识体系展开</div>
               </div>
             </div>
+            <div v-if="focusSkills" class="focus-tip">
+              <el-icon :size="15"><MagicStick /></el-icon>
+              <span>本次备战重点（来自报告/面试弱点）：{{ focusSkills }}</span>
+            </div>
             <el-form label-position="top">
               <el-form-item label="目标岗位">
                 <el-input v-model="targetPosition" placeholder="如：Java 后端开发工程师" @keyup.enter="goNext" />
@@ -69,6 +73,27 @@
                 {{ tj.company }} · {{ tj.name }}
               </button>
             </div>
+
+            <template v-if="plans.length">
+              <el-divider content-position="left">历史计划（{{ plans.length }}）</el-divider>
+              <div class="history-list history-plans">
+                <div
+                  v-for="p in plans"
+                  :key="p.id"
+                  class="history-item"
+                  @click="selectPlan(p)"
+                >
+                  <div class="history-main">
+                    <div class="history-route">
+                      {{ p.title }}
+                      <el-tag v-if="p.status === 'completed'" size="small" type="success">已完成</el-tag>
+                    </div>
+                    <el-progress :percentage="progressOf(p)" :stroke-width="6" class="mini-progress" />
+                  </div>
+                  <span class="history-time">{{ formatTime(p.created_at) }}</span>
+                </div>
+              </div>
+            </template>
           </section>
 
           <!-- ② 天数 + 简历 -->
@@ -105,7 +130,7 @@
               <span class="w-ico green"><el-icon :size="20"><Calendar /></el-icon></span>
               <div>
                 <div class="w-title">确认并生成</div>
-                <div class="w-desc">也可以从历史计划中直接查看进度</div>
+                <div class="w-desc">确认无误后，一键生成冲刺备战计划</div>
               </div>
             </div>
 
@@ -124,26 +149,6 @@
               </span>
             </div>
 
-            <template v-if="plans.length">
-              <div class="history-title">历史计划（{{ plans.length }}）</div>
-              <div class="history-list">
-                <div
-                  v-for="p in plans"
-                  :key="p.id"
-                  class="history-item"
-                  @click="selectPlan(p)"
-                >
-                  <div class="history-main">
-                    <div class="history-route">
-                      {{ p.title }}
-                      <el-tag v-if="p.status === 'completed'" size="small" type="success">已完成</el-tag>
-                    </div>
-                    <el-progress :percentage="progressOf(p)" :stroke-width="6" class="mini-progress" />
-                  </div>
-                  <span class="history-time">{{ formatTime(p.created_at) }}</span>
-                </div>
-              </div>
-            </template>
           </section>
         </transition>
       </div>
@@ -186,6 +191,10 @@
           <span class="route-sub">{{ current.summary }}</span>
         </div>
         <div class="result-actions">
+          <el-button size="small" @click="current = null">
+            <el-icon class="el-icon--left"><ArrowLeft /></el-icon>
+            返回
+          </el-button>
           <el-button size="small" @click="current = null">
             <el-icon class="el-icon--left"><RefreshLeft /></el-icon>
             新建计划
@@ -267,6 +276,7 @@ import {
   Odometer,
   RefreshLeft,
 } from '@element-plus/icons-vue'
+import { useRoute } from 'vue-router'
 import { getJobTrackSummary } from '@/api/jobTrack'
 import { listPositions } from '@/api/question'
 import { listResumes } from '@/api/diagnostic'
@@ -298,6 +308,10 @@ const resumes = ref([])
 // ── 从收藏 / 投递岗位快捷关联 ──
 const selectedPositionId = ref(null)
 const trackJobs = ref([])
+// 从其它页面带参跳入：岗位广场 position_id → 回填岗位；报告/面试弱点 skills → 提示条
+const route = useRoute()
+const pendingPositionId = ref(null)
+const focusSkills = ref('')
 
 const hotPositions = ['Java 后端开发工程师', '前端开发工程师', '算法工程师', '产品经理', '数据分析师']
 
@@ -368,6 +382,15 @@ async function loadTrackJobs() {
     const ids = new Set(summary.favorite_ids || [])
     for (const pid of Object.keys(summary.applications || {})) ids.add(Number(pid))
     trackJobs.value = all.filter((p) => ids.has(p.id))
+    // 从岗位广场带 position_id 跳入：若该岗位在收藏/投递中，回填岗位名
+    if (pendingPositionId.value) {
+      const p = trackJobs.value.find((x) => x.id === pendingPositionId.value)
+      if (p) {
+        selectedPositionId.value = p.id
+        targetPosition.value = p.name
+      }
+      pendingPositionId.value = null
+    }
   } catch { /* 忽略，未登录时静默 */ }
 }
 
@@ -387,8 +410,8 @@ async function runGenerate() {
     })
     ElMessage.success('备战计划已生成')
     await loadPlans()
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || e.message || '生成失败')
+  } catch {
+    /* 拦截器已统一提示 */
   } finally {
     generating.value = false
   }
@@ -400,8 +423,19 @@ function selectPlan(p) {
 
 async function toggleTask(day, done) {
   if (!current.value) return
-  current.value = await toggleStudyPlanTask(current.value.id, day, Boolean(done))
-  await loadPlans()
+  const plan = current.value
+  const prevTasks = plan.tasks
+  // 乐观更新：本地立即翻转勾选与进度，避免"点了没反应"
+  plan.tasks = (prevTasks || []).map((t) =>
+    Number(t.day) === day ? { ...t, done: Boolean(done) } : t
+  )
+  try {
+    current.value = await toggleStudyPlanTask(plan.id, day, Boolean(done))
+    await loadPlans()
+  } catch (e) {
+    // 请求失败回滚本地状态，错误提示已由 http 拦截器弹出
+    current.value = { ...plan, tasks: prevTasks }
+  }
 }
 
 async function removePlan() {
@@ -418,6 +452,13 @@ function formatTime(dt) {
 }
 
 onMounted(() => {
+  const q = route.query
+  if (q.position_id) {
+    pendingPositionId.value = Number(q.position_id)
+    selectedPositionId.value = Number(q.position_id)
+  }
+  if (q.target_position) targetPosition.value = String(q.target_position)
+  if (q.skills) focusSkills.value = String(q.skills)
   loadPlans()
   loadResumes()
   loadTrackJobs()
@@ -568,6 +609,23 @@ onMounted(() => {
 }
 
 /* ===== 快捷 chips ===== */
+.focus-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 10px;
+  background: rgba(52, 211, 153, 0.08);
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.focus-tip .el-icon {
+  color: #34d399;
+  flex: none;
+}
 .quick-row {
   display: flex;
   align-items: center;
@@ -656,6 +714,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.history-plans {
+  max-height: 300px;
+  overflow-y: auto;
 }
 .history-item {
   display: flex;
