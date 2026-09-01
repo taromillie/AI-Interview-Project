@@ -5,6 +5,7 @@
     {"event": "question", "data": {"round", "strategy", "question", "finished": False}}
     {"event": "finished", "data": {"message", "report_id"}}
 """
+import json
 import logging
 import threading
 from datetime import datetime
@@ -104,14 +105,14 @@ class InterviewOrchestrator:
             )
         )
 
-    def _asked_rounds(self) -> int:
+    def _asked_rounds(self, msgs: list[InterviewMessage]) -> int:
         """已问过的面试官问题数（assistant 消息）。"""
-        return sum(1 for m in self._messages() if m.role == "assistant")
+        return sum(1 for m in msgs if m.role == "assistant")
 
-    def _probe_streak(self) -> int:
+    def _probe_streak(self, msgs: list[InterviewMessage]) -> int:
         """当前话题连续追问轮数：从最近的 assistant 消息向前数连续追问策略。"""
         streak = 0
-        for m in reversed(self._messages()):
+        for m in reversed(msgs):
             if m.role != "assistant":
                 continue
             if m.strategy in PROBE_STRATEGIES:
@@ -120,10 +121,10 @@ class InterviewOrchestrator:
                 break
         return streak
 
-    def _avoid_streak(self) -> int:
+    def _avoid_streak(self, msgs: list[InterviewMessage]) -> int:
         """连续低信息/回避回答轮数：从最近的 user 消息向前数。"""
         streak = 0
-        for m in reversed(self._messages()):
+        for m in reversed(msgs):
             if m.role != "user":
                 continue
             if is_low_information(m.content):
@@ -132,10 +133,10 @@ class InterviewOrchestrator:
                 break
         return streak
 
-    def _history_text(self, limit: int = 6) -> str:
+    def _history_text(self, msgs: list[InterviewMessage], limit: int = 6) -> str:
         lines = [
             f"{'面试官' if m.role == 'assistant' else '候选人'}：{m.content}"
-            for m in self._messages()[-limit:]
+            for m in msgs[-limit:]
         ]
         return "\n".join(lines)
 
@@ -180,37 +181,61 @@ class InterviewOrchestrator:
             "data": {
                 "round": 1,
                 "strategy": "opening",
-                "question": self._last_question(),
+                "question": self._last_question(self._messages()),
                 "finished": False,
             },
         }
 
-    def _last_question(self) -> str:
-        msgs = self._messages()
+    def _last_question(self, msgs: list[InterviewMessage]) -> str:
         for m in reversed(msgs):
             if m.role == "assistant":
                 return m.content
         return ""
 
-    async def answer(self, content: str) -> dict:
-        """提交候选人回答，决策下一问或结束。"""
+    def _cache_answer_result(self, config: dict, request_id: str, result: dict) -> None:
+        """记录回答的幂等键与结果，供断线重发去重（重放，不重复记录回答）。"""
+        config["last_answer_request_id"] = request_id
+        config["last_answer_result"] = json.dumps(result, ensure_ascii=False)
+        self.interview.config = config
+        self.db.commit()
+
+    async def answer(self, content: str, request_id: str | None = None) -> dict:
+        """提交候选人回答，决策下一问或结束。
+
+        request_id 为断线重发去重的幂等键：同一 id 的重发直接重放上次结果，
+        避免回答被重复记录、轮数被重复推进（面试断线可恢复的关键）。
+        """
+        config = self.interview.config or {}
+        if request_id and config.get("last_answer_request_id") == request_id:
+            cached = config.get("last_answer_result")
+            if cached:
+                try:
+                    return json.loads(cached)
+                except (TypeError, ValueError):
+                    pass
+
         if self.interview.status not in ("asking", "created"):
             raise AppError("当前状态不可回答")
         if self.interview.status == "created":
             await self.start()
 
         self._save_message("user", content, None)
-        asked_rounds = self._asked_rounds()
+        # 会话消息只查一次，后续统计/决策全部复用，避免 N+1
+        msgs = self._messages()
+        asked_rounds = self._asked_rounds(msgs)
 
         if asked_rounds >= self.interview.max_rounds:
             self.db.commit()
-            return await self.finish()
+            result = await self.finish()
+            if request_id:
+                self._cache_answer_result(config, request_id, result)
+            return result
 
         # 已问过的题目 id 从消息的证据原子中收集（消息 id 与原子 id 各自自增，不能混用）
         asked_ids = set()
-        for m in self._messages():
+        for m in msgs:
             asked_ids.update(m.evidence_atom_ids or [])
-        probe_streak = self._probe_streak()
+        probe_streak = self._probe_streak(msgs)
 
         # ---- 工作包 A：有边界工具装配（只读 + 单轮≤3 次调用） ----
         guard = ToolCallGuard()
@@ -220,7 +245,7 @@ class InterviewOrchestrator:
         bank = BANK_SOURCES.get(source)
         if bank is not None:
             # 内置问题库模式（谈薪/综合/转行）：候选来自对应题库（剔除已问），不检索技术题库
-            asked_texts = {m.content for m in self._messages() if m.role == "assistant"}
+            asked_texts = {m.content for m in msgs if m.role == "assistant"}
             candidate_texts = [q for q in bank if q not in asked_texts]
             candidates: list = []
             hit = 0
@@ -242,7 +267,7 @@ class InterviewOrchestrator:
             # 工具③ 技能覆盖度提示（辅助换话题方向）
             coverage_res = get_coverage(
                 self._position_skills(),
-                [m.content for m in self._messages() if m.role == "assistant"],
+                [m.content for m in msgs if m.role == "assistant"],
                 guard=guard,
             )
             coverage = coverage_res.data or {}
@@ -257,7 +282,7 @@ class InterviewOrchestrator:
             content,
             hit_score=hit,
             probe_streak=probe_streak,
-            avoid_streak=self._avoid_streak(),
+            avoid_streak=self._avoid_streak(msgs),
             enable_recall=source == "knowledge",
         )
 
@@ -265,7 +290,7 @@ class InterviewOrchestrator:
             position_name=self._position_name(),
             position_skills=self._position_skills(),
             resume_brief=resume_evidence or self._resume_brief(),
-            history_text=self._history_text(),
+            history_text=self._history_text(msgs),
             latest_answer=content,
             candidates=candidate_texts,
             asked_rounds=asked_rounds,
@@ -290,7 +315,10 @@ class InterviewOrchestrator:
 
         if decision.get("action") == "finish" or asked_rounds >= self.interview.max_rounds:
             self.db.commit()
-            return await self.finish()
+            result = await self.finish()
+            if request_id:
+                self._cache_answer_result(config, request_id, result)
+            return result
 
         question = (decision.get("question") or "").strip()
         if not question:
@@ -306,7 +334,7 @@ class InterviewOrchestrator:
             evidence_atom_ids=[c.id for c in candidates],
         )
         self.db.commit()
-        return {
+        result = {
             "event": "question",
             "data": {
                 "round": asked_rounds + 1,
@@ -315,6 +343,9 @@ class InterviewOrchestrator:
                 "finished": False,
             },
         }
+        if request_id:
+            self._cache_answer_result(config, request_id, result)
+        return result
 
     async def finish(self) -> dict:
         """结束面试：立即返回，复盘报告在后台线程生成，接口不再长时间等待 LLM。
@@ -351,6 +382,7 @@ class InterviewOrchestrator:
             summary=REPORT_PENDING_SUMMARY,
             coverage={"covered": [], "uncovered": []},
             learning_path=[],
+            status="pending",
         )
         self.interview.status = "reported"
         self.interview.finished_at = datetime.now()

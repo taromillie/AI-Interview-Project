@@ -210,6 +210,45 @@ class TestAnswer:
         # 连续追问达到上限，必须强制切换话题
         assert outcome["data"]["strategy"] == "switch_topic"
 
+    async def test_answer_idempotent_redelivery(self, db, user, position):
+        """断线重发（同 request_id）→ 重放结果，回答不被重复记录。"""
+        make_atom(db, position)
+        it = make_interview(db, user, position, max_rounds=3)
+        orch = InterviewOrchestrator(db, user, it, FakeLLM())
+        await orch.start()
+        first = await orch.answer("回答 A", request_id="req-1")
+        second = await orch.answer("回答 A", request_id="req-1")  # 断线后的重发
+        assert first == second
+        roles = [m.role for m in messages_of(db, it.id)]
+        assert roles.count("user") == 1  # 回答未被重复记录
+        assert roles == ["assistant", "user", "assistant"]  # 轮数未被重复推进
+
+    async def test_answer_idempotent_replays_finished(self, db, user, position):
+        """最终轮断线重发：面试已结束也能重放 finished 结果，且不新增消息。"""
+        make_atom(db, position)
+        it = make_interview(db, user, position, max_rounds=1)
+        orch = InterviewOrchestrator(db, user, it, FakeLLM())
+        await orch.start()
+        first = await orch.answer("回答 A", request_id="req-final")
+        assert first["event"] == "finished"
+        assert it.status == "reported"
+        second = await orch.answer("回答 A", request_id="req-final")
+        assert second == first
+        assert len(messages_of(db, it.id)) == 3  # opening + user + farewell
+
+    async def test_answer_new_request_id_not_deduplicated(self, db, user, position):
+        """新回答（新 request_id）→ 正常处理，不误去重。"""
+        make_atom(db, position)
+        it = make_interview(db, user, position, max_rounds=3)
+        orch = InterviewOrchestrator(db, user, it, FakeLLM())
+        await orch.start()
+        await orch.answer("回答 A", request_id="req-1")
+        outcome = await orch.answer("回答 B", request_id="req-2")
+        assert outcome["event"] == "question"
+        assert outcome["data"]["round"] == 3
+        roles = [m.role for m in messages_of(db, it.id)]
+        assert roles.count("user") == 2
+
 
 # ── finish：结束与幂等 ──
 class TestFinish:

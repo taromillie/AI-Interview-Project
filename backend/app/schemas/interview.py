@@ -58,8 +58,14 @@ class ReportOut(BaseModel):
     summary: str = ""
     coverage: dict = {}
     learning_path: list = []
+    # pending=后台生成中 / ready=AI 完整报告 / fallback=AI 降级规则报告 / failed=生成失败可重试
+    status: str = "pending"
 
     # 旧数据迁移后这些列可能为 NULL：统一兜底为默认值，避免 500
+    @field_validator("status", mode="before")
+    @classmethod
+    def _status_or_default(cls, v):
+        return v if v is not None else "pending"
     @field_validator("dimensions", "coverage", mode="before")
     @classmethod
     def _dict_or_default(cls, v):
@@ -88,3 +94,5 @@ class InterviewDetailOut(InterviewOut):
 
 class AnswerRequest(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
+    # 断线重发幂等键：同一 request_id 的重复提交直接重放结果，避免回答被重复记录
+    request_id: str | None = Field(default=None, max_length=64)

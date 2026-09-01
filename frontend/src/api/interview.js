@@ -20,8 +20,13 @@ export function startInterview(interviewId, { onEvent, signal } = {}) {
 }
 
 // 提交回答（SSE：thinking → question / finished / error）
-export function answerInterview(interviewId, content, { onEvent, signal } = {}) {
-  return postSSE(`/interviews/${interviewId}/answer`, { content }, { onEvent, signal })
+// requestId：断线重发幂等键，同一回答重发时复用，避免服务端重复记录
+export function answerInterview(interviewId, content, { onEvent, signal, requestId } = {}) {
+  return postSSE(
+    `/interviews/${interviewId}/answer`,
+    { content, request_id: requestId },
+    { onEvent, signal }
+  )
 }
 
 // 结束面试并生成报告

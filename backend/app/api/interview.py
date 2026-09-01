@@ -11,7 +11,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -29,7 +29,7 @@ from app.schemas.interview import (
     InterviewMessageOut,
     InterviewOut,
 )
-from app.services.interview_orchestrator import InterviewOrchestrator, REPORT_PENDING_SUMMARY
+from app.services.interview_orchestrator import InterviewOrchestrator
 from app.services.llm_utils import require_llm
 from app.repositories import InterviewRepository
 
@@ -45,25 +45,21 @@ def _own_interview(db: Session, user: User, interview_id: int) -> Interview:
     return interview
 
 
-def _make_out(db: Session, interview: Interview) -> InterviewOut:
-    position_name = None
-    if interview.position_id:
-        pos = db.get(Position, interview.position_id)
-        position_name = pos.name if pos else None
-    interviewer_name = None
-    if interview.interviewer_id:
-        iv = db.get(Interviewer, interview.interviewer_id)
-        interviewer_name = iv.name if iv else None
-    report = db.scalar(select(Report).where(Report.interview_id == interview.id))
-    message_count = repository.message_count(db, interview.id)
+def _build_out(
+    interview: Interview,
+    position: Position | None,
+    interviewer: Interviewer | None,
+    report: Report | None,
+    message_count: int,
+) -> InterviewOut:
     return InterviewOut(
         id=interview.id,
         position_id=interview.position_id,
-        position_name=position_name,
+        position_name=position.name if position else None,
         target_position=(interview.config or {}).get("target_position"),
         resume_id=interview.resume_id,
         interviewer_id=interview.interviewer_id,
-        interviewer_name=interviewer_name,
+        interviewer_name=interviewer.name if interviewer else None,
         difficulty=interview.difficulty,
         mode=interview.mode,
         interview_type=interview.interview_type,
@@ -73,9 +69,58 @@ def _make_out(db: Session, interview: Interview) -> InterviewOut:
         report_id=report.id if report else None,
         overall_score=report.overall_score if report else None,
         message_count=message_count or 0,
-        # 占位报告（summary 为固定占位文案）说明复盘仍在后台生成，前端据此展示“分析中”
-        report_generating=bool(report and report.summary == REPORT_PENDING_SUMMARY),
+        # 报告状态 pending（后台生成中）时前端展示"分析中"；ready/fallback/failed 均视为已有结果
+        report_generating=bool(report and report.status == "pending"),
     )
+
+
+def _make_out(db: Session, interview: Interview) -> InterviewOut:
+    position = db.get(Position, interview.position_id) if interview.position_id else None
+    interviewer = db.get(Interviewer, interview.interviewer_id) if interview.interviewer_id else None
+    report = db.scalar(select(Report).where(Report.interview_id == interview.id))
+    return _build_out(
+        interview, position, interviewer, report, repository.message_count(db, interview.id)
+    )
+
+
+def _make_out_batch(db: Session, interviews: list[Interview]) -> list[InterviewOut]:
+    """批量组装列表输出：预取岗位/面试官/报告/消息计数，避免 N+1。"""
+    if not interviews:
+        return []
+    ids = [i.id for i in interviews]
+    pos_ids = {i.position_id for i in interviews if i.position_id}
+    iv_ids = {i.interviewer_id for i in interviews if i.interviewer_id}
+    positions = (
+        {p.id: p for p in db.scalars(select(Position).where(Position.id.in_(pos_ids))).all()}
+        if pos_ids
+        else {}
+    )
+    interviewers = (
+        {iv.id: iv for iv in db.scalars(select(Interviewer).where(Interviewer.id.in_(iv_ids))).all()}
+        if iv_ids
+        else {}
+    )
+    reports = {
+        r.interview_id: r
+        for r in db.scalars(select(Report).where(Report.interview_id.in_(ids))).all()
+    }
+    counts = dict(
+        db.execute(
+            select(InterviewMessage.interview_id, func.count(InterviewMessage.id))
+            .where(InterviewMessage.interview_id.in_(ids))
+            .group_by(InterviewMessage.interview_id)
+        ).all()
+    )
+    return [
+        _build_out(
+            i,
+            positions.get(i.position_id),
+            interviewers.get(i.interviewer_id),
+            reports.get(i.id),
+            counts.get(i.id, 0),
+        )
+        for i in interviews
+    ]
 
 
 @router.post("", response_model=InterviewOut, status_code=201)
@@ -135,7 +180,8 @@ def _sse(result):
             "data": json.dumps(outcome["data"], ensure_ascii=False),
         }
 
-    return EventSourceResponse(gen())
+    # ping=15：空闲时发送心跳注释，避免代理/网关超时掐断 SSE 长连接
+    return EventSourceResponse(gen(), ping=15)
 
 
 @router.post("/{interview_id}/start")
@@ -173,7 +219,8 @@ async def start_interview(
             "data": json.dumps(outcome["data"], ensure_ascii=False),
         }
 
-    return EventSourceResponse(gen())
+    # ping=15：空闲时发送心跳注释，避免代理/网关超时掐断 SSE 长连接
+    return EventSourceResponse(gen(), ping=15)
 
 
 @router.post("/{interview_id}/answer")
@@ -196,9 +243,16 @@ async def submit_answer(
             "data": json.dumps({"message": "面试官正在思考…"}, ensure_ascii=False),
         }
         try:
-            outcome = await orchestrator.answer(payload.content)
+            outcome = await orchestrator.answer(payload.content, request_id=payload.request_id)
         except AppError as exc:
             yield {"event": "error", "data": json.dumps({"message": str(exc)}, ensure_ascii=False)}
+            return
+        except Exception as exc:  # noqa: BLE001 - SSE 兜底，避免回答失败直接断流
+            logger.warning("面试回答失败 interview_id=%s: %s", interview_id, exc)
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": "面试官暂时不可用，请稍后重试"}, ensure_ascii=False),
+            }
             return
         # 面试结束时：先发面试官结束语，再发 finished
         farewell = (outcome.get("data") or {}).pop("farewell", None)
@@ -209,7 +263,8 @@ async def submit_answer(
             "data": json.dumps(outcome["data"], ensure_ascii=False),
         }
 
-    return EventSourceResponse(gen())
+    # ping=15：空闲时发送心跳注释，避免代理/网关超时掐断 SSE 长连接
+    return EventSourceResponse(gen(), ping=15)
 
 
 @router.post("/{interview_id}/finish")
@@ -235,7 +290,7 @@ def list_interviews(
     db: Session = Depends(get_db),
 ):
     rows = repository.list_by_user(db, user.id)
-    return [_make_out(db, i) for i in rows]
+    return _make_out_batch(db, list(rows))
 
 
 @router.get("/{interview_id}", response_model=InterviewDetailOut)
