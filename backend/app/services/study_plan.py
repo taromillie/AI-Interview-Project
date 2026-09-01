@@ -65,7 +65,7 @@ def _rule_plan(days: int, target_position: str, gaps: list[str]) -> dict:
 
 async def generate_study_plan(
     db: Session,
-    llm: LLMProvider,
+    llm: LLMProvider | None,
     *,
     user_id: int,
     target_position: str,
@@ -75,6 +75,8 @@ async def generate_study_plan(
 ) -> StudyPlan:
     """生成备战计划并落库。
 
+    llm 为 None 时（未配置模型）直接使用规则模板；
+    LLM 调用失败时同样用规则模板兜底，保证接口总能返回可执行计划。
     position_id 可选：自动回填目标岗位名称，并将岗位关键技能并入学习上下文。
     """
     days = max(3, min(int(days), 60))
@@ -114,41 +116,46 @@ async def generate_study_plan(
         skills="、".join(skills) or "（未提供）",
         resume_brief=brief,
     )
-    try:
-        raw = await llm.achat([ChatMessage("user", prompt)], temperature=0.3, max_tokens=2600)
-        data = _extract_json(raw)
-        tasks = []
-        for it in data.get("tasks") or []:
-            if isinstance(it, dict) and it.get("day") is not None:
-                day = max(1, int(it["day"]))
-                topics = [str(t)[:60] for t in (it.get("topics") or []) if str(t).strip()][:4]
-                tasks.append({
-                    "day": day,
-                    "title": str(it.get("title") or f"第 {day} 天")[:100],
-                    "description": str(it.get("description") or "")[:300],
-                    "topics": topics,
-                    "done": False,
-                })
-        tasks = sorted(tasks, key=lambda x: x["day"])[:days]
-        if len(tasks) < days:  # 不足补足
-            for i in range(1, days + 1):
-                if i not in {t["day"] for t in tasks}:
+    if llm is None:
+        logger.info("未配置 LLM，使用规则模板生成备战计划")
+        fallback = _rule_plan(days, target_position, weak_points)
+        title, summary, tasks = fallback["title"], fallback["summary"], fallback["tasks"]
+    else:
+        try:
+            raw = await llm.achat([ChatMessage("user", prompt)], temperature=0.3, max_tokens=2600)
+            data = _extract_json(raw)
+            tasks = []
+            for it in data.get("tasks") or []:
+                if isinstance(it, dict) and it.get("day") is not None:
+                    day = max(1, int(it["day"]))
+                    topics = [str(t)[:60] for t in (it.get("topics") or []) if str(t).strip()][:4]
                     tasks.append({
-                        "day": i,
-                        "title": f"第 {i} 天：查漏补缺与复习",
-                        "description": "复习前几日知识点，整理错题与薄弱环节。",
-                        "topics": ["复习巩固"],
+                        "day": day,
+                        "title": str(it.get("title") or f"第 {day} 天")[:100],
+                        "description": str(it.get("description") or "")[:300],
+                        "topics": topics,
                         "done": False,
                     })
             tasks = sorted(tasks, key=lambda x: x["day"])[:days]
-        title = str(data.get("title") or f"{target_position} {days} 天冲刺计划")[:120]
-        summary = str(data.get("summary") or "")[:200]
-        if not tasks:
-            raise ValueError("LLM 输出无任务")
-    except Exception:
-        logger.warning("study plan LLM 失败，使用规则回退", exc_info=True)
-        fallback = _rule_plan(days, target_position, weak_points)
-        title, summary, tasks = fallback["title"], fallback["summary"], fallback["tasks"]
+            if len(tasks) < days:  # 不足补足
+                for i in range(1, days + 1):
+                    if i not in {t["day"] for t in tasks}:
+                        tasks.append({
+                            "day": i,
+                            "title": f"第 {i} 天：查漏补缺与复习",
+                            "description": "复习前几日知识点，整理错题与薄弱环节。",
+                            "topics": ["复习巩固"],
+                            "done": False,
+                        })
+                tasks = sorted(tasks, key=lambda x: x["day"])[:days]
+            title = str(data.get("title") or f"{target_position} {days} 天冲刺计划")[:120]
+            summary = str(data.get("summary") or "")[:200]
+            if not tasks:
+                raise ValueError("LLM 输出无任务")
+        except Exception:
+            logger.warning("study plan LLM 失败，使用规则回退", exc_info=True)
+            fallback = _rule_plan(days, target_position, weak_points)
+            title, summary, tasks = fallback["title"], fallback["summary"], fallback["tasks"]
 
     plan = StudyPlan(
         user_id=user_id,

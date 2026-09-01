@@ -39,8 +39,9 @@ def fake_llm(monkeypatch):
     def provide(db, user):
         return llm
 
-    for module in ("career", "salary", "study_plan", "interview"):
+    for module in ("career", "salary", "interview"):
         monkeypatch.setattr(f"app.api.{module}.require_llm", provide)
+    monkeypatch.setattr("app.api.study_plan.get_llm_for_user", lambda db, user_id: llm)
     monkeypatch.setattr("app.workers.report.get_llm_for_user", lambda db, user_id: llm)
     return llm
 
@@ -141,3 +142,17 @@ def test_async_report_task_and_status(phase2_client, phase2_auth, fake_llm):
     status = phase2_client.get(f"/api/reports/interviews/{interview_id}/status", headers=phase2_auth)
     assert status.status_code == 200
     assert status.json()["status"] == "reported"
+
+
+def test_study_plan_without_llm_falls_back(phase2_client, phase2_auth):
+    """未配置 LLM 时生成备战计划 → 规则模板兜底返回 200，不报 400。"""
+    response = phase2_client.post(
+        "/api/study-plan/generate",
+        json={"target_position": "前端开发", "days": 5},
+        headers=phase2_auth,
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["days"] == 5
+    assert len(data["tasks"]) == 5
+    assert all(t["topics"] and t["description"] for t in data["tasks"])

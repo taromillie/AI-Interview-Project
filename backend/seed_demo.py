@@ -19,6 +19,9 @@ _BASE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(_BASE)
 sys.path.insert(0, _BASE)
 
+# 演示脚本属于开发工具：未显式指定环境时按开发模式运行，避免默认密钥被生产强校验拦截
+os.environ.setdefault("DEBUG", "true")
+
 from app.core.db import SessionLocal, init_db  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.models.job_track import JobApplication, JobFavorite  # noqa: E402

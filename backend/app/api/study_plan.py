@@ -14,7 +14,7 @@ from app.schemas.study_plan import (
     StudyPlanOut,
     StudyPlanTaskIn,
 )
-from app.services.llm_utils import require_llm
+from app.services.llm_utils import get_llm_for_user
 from app.services.study_plan import generate_study_plan
 
 router = APIRouter(prefix="/study-plan", tags=["备战日历"])
@@ -37,7 +37,8 @@ async def create_study_plan(
             resume = db.scalar(
                 select(Resume).where(Resume.user_id == user.id).order_by(Resume.id.desc())
             )
-    llm = require_llm(db, user)
+    # 未配置 LLM 时传 None，由服务层使用规则模板兜底生成
+    llm = get_llm_for_user(db, user.id)
     plan = await generate_study_plan(
         db, llm, user_id=user.id, target_position=payload.target_position,
         days=payload.days, resume=resume, position_id=payload.position_id,

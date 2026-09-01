@@ -1,5 +1,6 @@
 """Offer 对比接口（Phase 3，FR-F-03）。"""
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -25,6 +26,8 @@ from app.services.offer_compare import (
     build_compare_table,
     stream_compare_analysis,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/offers", tags=["Offer 对比"])
 
@@ -246,9 +249,17 @@ async def stream_compare_history(
     async def gen():
         collected: list[str] = []
         try:
-            async for chunk in stream_compare_analysis(llm, offers):
-                collected.append(chunk)
-                yield _sse_event(chunk)
+            try:
+                async for chunk in stream_compare_analysis(llm, offers):
+                    collected.append(chunk)
+                    yield _sse_event(chunk)
+            except Exception as exc:  # noqa: BLE001 - 流中断时通知前端，规则兜底仍在 finally 执行
+                logger.warning("Offer 对比分析流式生成失败 record_id=%s: %s", record_id, exc)
+                yield (
+                    "event: error\ndata: "
+                    + json.dumps({"message": "AI 分析中断，已切换为本地摘要"}, ensure_ascii=False)
+                    + "\n\n"
+                )
         finally:
             text = "".join(collected).strip()
             if not text:

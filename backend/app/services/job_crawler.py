@@ -146,7 +146,8 @@ class RobotsGuard:
         try:
             rp = urllib.robotparser.RobotFileParser()
             rp.set_url(f"{self.base_url}/robots.txt")
-            with httpx.Client(timeout=10, follow_redirects=True) as client:
+            # 短超时：robots.txt 不可用时快速放行，避免后台采集线程被网络阻塞数分钟
+            with httpx.Client(timeout=5, follow_redirects=True) as client:
                 resp = client.get(f"{self.base_url}/robots.txt", headers={"User-Agent": USER_AGENT})
                 if resp.status_code == 200:
                     rp.parse(resp.text.splitlines())
@@ -163,7 +164,8 @@ class RobotsGuard:
 
     @staticmethod
     def polite_sleep() -> None:
-        time.sleep(random.uniform(3.0, 6.0))
+        # 限速上限封顶（≤10s），保证单次同步总时长可控
+        time.sleep(min(random.uniform(3.0, 6.0), 10.0))
 
 
 # ---------------------------------------------------------------------------
