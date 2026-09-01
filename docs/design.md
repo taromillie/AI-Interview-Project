@@ -2,14 +2,14 @@
 
 | 项目名称 | AI 模拟面试官与职业规划系统 |
 |---|---|
-| 文档版本 | v1.2 |
-| 创建日期 | 2026-08-27（v1.2 修订于 2026-08-29） |
+| 文档版本 | v1.3 |
+| 创建日期 | 2026-08-27（v1.3 修订于 2026-08-31） |
 | 文档类型 | 架构设计文档 |
-| 关联文档 | [需求文档](requirements.md) v1.1 |
+| 关联文档 | [需求文档](requirements.md) v1.2 |
 | 项目定位 | 课程 / 毕业设计项目 |
 | 技术路线 | Python（FastAPI + LangChain + 向量检索） |
 
-> **v1.2 修订说明**：① 新增**真实面试复盘**设计（RealInterview 模型 + AI 逐题批改，聚合进能力画像）；② 新增**备战计划**设计（StudyPlan 模型 + 画像缺口驱动生成 N 天任务）；③ 新增**岗位爬虫与同步**设计（job_crawler + sync_state，幂等入库 + 失败兜底）；④ 新增**简历→岗位智能匹配**设计（ResumePositionMatch 覆盖式保存）；⑤ 新增 **Offer 对比**设计（加权评分 + AI 建议）；⑥ 目录结构、ER 概要、核心表、API 概览同步更新。历史修订：v1.1（2026-08-27）新增前端设计系统、面试官角色系统、难度档位体系、岗位广场。
+> **v1.3 修订说明**：在 v1.2 基础上同步当前实现：新增**岗位收藏与投递跟踪**（状态流转与概览）、**岗位数据质量清洗**（名称归一、技能规范化与补全）、**题库批量导入与 AI 出题**（JSON/Markdown 解析、预览后保存草稿）、**Offer 对比历史与流式分析**、**报告生成状态与重新生成**、以及更完整的用户数据隔离与接口契约说明。历史修订：v1.2（2026-08-29）新增真实面试复盘、备战计划、岗位同步、简历→岗位匹配、Offer 对比；v1.1（2026-08-27）新增前端设计系统、面试官角色系统、难度档位体系、岗位广场。
 
 ---
 
@@ -581,7 +581,10 @@ users 1───N study_plans
 | `real_interviews` | id, user_id, company, position, interview_date, round_type, notes, review_json, created_at | 真实面试复盘（review: {overall_score, dimensions, summary, suggestions}） |
 | `real_interview_items` | id, interview_id(FK, CASCADE), question, answer, score, comment | 真实面试单条问答与 AI 批改 |
 | `offers` | id, user_id, company, position, city, monthly_salary, bonus_months, stock_value, work_balance, benefits, notes, created_at | Offer 记录 |
+| `offer_compare_records` | id, user_id, offer_ids, company_names, table_json, analysis, created_at | Offer 对比快照，独立于原 Offer 生命周期 |
 | `study_plans` | id, user_id, title, target_position, days, tasks_json, status(active/completed/archived), summary, created_at | 备战计划（tasks: [{day, title, description, topics, done}]） |
+| `job_favorites` | id, user_id, position_id, created_at | 用户岗位收藏，user_id + position_id 唯一 |
+| `job_applications` | id, user_id, position_id, status, note, created_at, updated_at | 投递跟踪，状态为 saved/applied/interviewing/offer/rejected |
 
 > JSON 字段使用 SQLite JSON 类型（可迁移到 PostgreSQL JSONB）。
 
@@ -608,6 +611,9 @@ users 1───N study_plans
 | 岗位 | GET | `/api/positions` | 岗位广场列表（筛选：方向/难度/来源 + 关键词搜索） | JWT |
 | 岗位 | GET | `/api/positions/{id}` | 岗位详情（技能/JD/薪资区间） | JWT |
 | 岗位 | POST | `/api/positions` | 用户自建岗位 | JWT |
+| 报告 | POST | `/api/reports/interviews/{id}/generate` | 异步生成报告 | JWT |
+| 报告 | GET | `/api/reports/interviews/{id}/status` | 查询报告生成状态 | JWT |
+| 报告 | POST | `/api/reports/{id}/regenerate` | 重新生成报告 | JWT |
 | 报告 | GET | `/api/reports/{id}` | 查询复盘报告 | JWT |
 | 转行 | POST | `/api/career/diagnosis` | 转行诊断 | JWT |
 | 谈薪 | POST | `/api/salary/evaluate` | 薪资评估 | JWT |
@@ -619,8 +625,20 @@ users 1───N study_plans
 | 备战计划 | POST | `/api/study-plans/generate` | 基于画像缺口+目标岗位生成计划 | JWT |
 | 备战计划 | GET/PATCH/DELETE | `/api/study-plans` | 计划列表 / 任务勾选 / 删除 | JWT |
 | Offer | CRUD | `/api/offers` | Offer 录入管理 | JWT |
-| Offer | GET | `/api/offers/compare` | 多 Offer 加权对比 + AI 建议（需 ≥2） | JWT |
+| Offer | POST | `/api/offers/compare` | 多 Offer 加权对比 + AI 建议（需 ≥2） | JWT |
+| Offer | GET | `/api/offers/compare/history` | 查询对比历史列表 | JWT |
+| Offer | GET | `/api/offers/compare/history/{id}` | 查询对比历史详情 | JWT |
+| Offer | DELETE | `/api/offers/compare/history/{id}` | 删除对比历史 | JWT |
+| Offer | GET | `/api/offers/compare/history/{id}/stream` | SSE 流式获取分析结果 | JWT |
+| 岗位跟踪 | GET | `/api/job-track/summary` | 当前用户收藏与投递状态概览 | JWT |
+| 岗位跟踪 | POST/DELETE | `/api/job-track/positions/{id}/favorite` | 收藏/取消收藏岗位 | JWT |
+| 岗位跟踪 | PUT/DELETE | `/api/job-track/positions/{id}/application` | 更新/删除投递状态 | JWT |
 | 画像 | GET | `/api/profile` | 能力画像聚合（雷达图/趋势/弱点） | JWT |
+| 题库 | POST | `/api/questions/import` | JSON/Markdown 批量导入题目 | JWT |
+| 题库 | POST | `/api/questions/generate` | AI 生成题目预览 | JWT |
+| 题库 | POST | `/api/questions/generate/save` | 保存 AI 生成题目为私有草稿 | JWT |
+| 岗位同步 | POST | `/api/questions/positions/sync` | 手动触发岗位数据同步 | JWT |
+| 岗位同步 | GET/POST | `/api/questions/positions/sync-config` | 查询/更新自动同步配置 | JWT |
 
 **岗位创建请求（POST /api/positions）**：
 

@@ -1,6 +1,6 @@
 # AI 模拟面试官与职业规划系统
 
-面向求职者的 AI 面试训练与职业规划平台：简历 × JD 智能匹配诊断、动态追问模拟面试（文字/语音）、面试复盘与能力成长追踪、真实面试复盘、转行诊断、谈薪模拟、Offer 对比与备战计划。
+面向求职者的 AI 面试训练与职业规划平台：简历 × JD 智能匹配诊断、动态追问模拟面试（文字/语音/视频）、面试复盘与能力成长追踪、真实面试复盘、转行诊断、谈薪模拟、Offer 对比与备战计划。
 
 ## 功能特性
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | 简历 × JD 智能匹配 | 上传简历 + 粘贴目标岗位 JD，输出匹配分、技能缺口与逐项优化建议 |
 | 简历 → 岗位匹配 | 按简历技能从岗位库匹配推荐岗位 Top N，展示命中/缺口技能、匹配度与推荐理由 |
-| 动态追问模拟面试 | 有边界面试 Agent，基于回答动态决策「深挖 / 补救 / 换题 / 项目追问」，SSE 流式对话；支持语音输入与语音播报（Web Speech API） |
+| 动态追问模拟面试 | 有边界面试 Agent，基于回答动态决策「深挖 / 补救 / 换题 / 项目追问」，SSE 流式对话；支持语音输入播报（Web Speech API）与视频模式（摄像头画面 + 轻量活动监测，不可用时自动降级语音/文字） |
 | 面试官角色库 | 内置/自建面试官人设（风格、追问偏好、难度偏移），面试前按需选择 |
 | 复盘报告 | 逐题批改、四维度评分、弱点标签、总评建议 |
 | 能力画像与成长趋势 | 多场面试聚合六维雷达图 + 技能评分 + 高频弱点 + 时间维度趋势折线 |
@@ -34,7 +34,7 @@
 ### 方式一：Docker Compose（推荐）
 
 ```bash
-# 首次使用：复制部署环境变量（可选，所有项均有默认值）
+# 首次使用：复制环境变量模板并填写强密钥（生产必须）
 #   Windows:  copy .env.example .env
 #   macOS/Linux: cp .env.example .env
 docker compose up --build
@@ -44,6 +44,7 @@ docker compose up --build
 - 后端 API 文档：<http://localhost:8000/docs>
 
 > 依赖 Docker（需要本机已安装并启动 Docker Desktop / Docker Engine）。
+> **安全校验**：`DEBUG` 默认 `false`（生产模式），此时默认 `JWT_SECRET`/`AES_KEY` 会直接拒绝启动（强制换强密钥）；仅本地演示可设 `DEBUG=true` 使用默认密钥（会收到告警）。
 > 后端数据（SQLite + 向量库）持久化在 Docker 卷 `backend_data` 中。
 > 实机验证清单见 `docs/deploy-verification.md`（12 项检查：健康 / 持久化 / SSE / 日志级别等）。
 
@@ -57,8 +58,10 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # macOS / Linux
 pip install -r requirements.txt
-cp .env.example .env         # 填入 LLM API Key 等配置
+cp .env.example .env         # 本地开发默认即可（DEBUG=true）
 uvicorn app.main:app --reload --port 8000
+# 可选：初始化演示数据（示例岗位/面试官/题库）
+python seed_demo.py
 ```
 
 **前端**
@@ -90,6 +93,9 @@ LLM_MODEL=deepseek-chat
 | `docs/design.md` | 架构设计：决策记录、目录结构、ER 设计、API 设计、演进路径 |
 | `docs/next-step-plan.md` | 下一步迭代方案（P4 打磨验收与发布准备） |
 | `docs/requirements.md` | 需求说明 |
+| `docs/deploy-verification.md` | Docker 实机部署验证清单（健康/持久化/SSE/日志等 12 项） |
+| `docs/environment.md` | 部署环境变量说明（含安全强校验要求） |
+| `docs/backup-and-restore.md` | 数据库备份与恢复步骤 |
 
 ## 开发进度
 
@@ -121,14 +127,23 @@ LLM_MODEL=deepseek-chat
 - ✅ 能力画像增强：新增成长趋势（时间维度折线）
 - ✅ 公共题库：管理员发布机制
 
-### 待办 · P4 打磨验收与发布准备
+### Phase 4 · 视频面试与发布加固 ✅（2026-08-29 ~ 09-01）
+
+- ✅ 视频面试：摄像头画面 + 轻量画面活动监测（像素差分，无需人脸库），摄像头不可用自动降级语音/文字
+- ✅ 面试流程重构：向导式三步启动（岗位 → 面试官 → 设置）→ 对话页，组件化拆分
+- ✅ SSE 健壮性：断线重发幂等（request_id 去重）、回答结果缓存、前端断线自动重连
+- ✅ 报告状态机：pending / ready / fallback / failed 显式流转，失败可重试，新增「重新生成」接口
+- ✅ 生产安全加固：默认 `DEBUG=false`，弱密钥拒绝启动、`/health/live` 存活检查、优雅停机、Docker healthcheck 严格化
+- ✅ 服务降级兜底：备战计划无 LLM 时规则模板生成、Offer 对比流中断本地摘要兜底
+- ✅ 后端测试补强：149 项（数据隔离 / 健康检查 / 安全配置 / 报告状态 / 服务降级 / SSE 健壮性）
+
+### 待办 · P5 发布准备
 
 - [ ] T2 部署验证：Docker Compose 实机验证（清单 `docs/deploy-verification.md`）、`.env` 生产化（需 Docker 机器）
-- [ ] T4 后端测试补强：RAG 链路、真实复盘、岗位同步（目标 ≥45 项）
 - [ ] T5 前端自动化测试（Vitest，≥10 项）
 - [ ] T3 演示准备：一键演示数据脚本 + 演示脚本文档
-- [ ] T6 体验优化：面试流式展示/断线提示、报告加载态、首屏性能
-- [ ] 视频面试（C 级低优先）、题库批量导入、岗位投递状态跟踪
+- [ ] T6 体验优化：面试流式展示/断线提示（SSE 幂等与报告状态机已完成）、首屏性能
+- [ ] 题库批量导入、岗位投递状态跟踪
 
 ## 目录结构
 

@@ -15,7 +15,10 @@
 | 必做 | P0-1 简化版：LLM 调用加轻量重试（只做重试，不做熔断/封装重构） | 0.5 天 | ✅ 已完成（`openai_compat.py`，2 次指数退避重试） |
 | 建议 | P0-4 简化版：finish 幂等（原子状态更新即可，不做线程池） | 0.5 天 | ✅ 已完成（`interview_orchestrator.py`） |
 | 建议 | P1-5 补编排器 + 报告降级单测 | 0.5 天 | ✅ 已完成（`test_interview_orchestrator.py` + `test_feedback.py`，22 项用例） |
-| 砍掉 | P0-2 安全基线、P1-1/2/3 性能优化、P1-4 组件拆分、全部 P2 | —— | —— |
+| 建议 | P1-1/2 性能优化（历史列表 N+1、编排器消息查询复用） | 0.5 天 | ✅ 已完成（`interview.py` 批量预取 + 编排器 `answer()` 消息单查） |
+| 建议 | P1-3 岗位采集降级优化（robots 短超时 + 限速封顶 + 优雅停机） | 0.5 天 | ✅ 已完成（`job_crawler.py` robots 5s 超时 + `polite_sleep` ≤10s；`main.py` `stop_event.wait()` 轮询 + 停机 join） |
+| 建议 | P1-4 前端巨型组件拆分 | 1 天 | ✅ 已完成（`Interview.vue` 1776→534 行；子组件均 <500 行；`useVoice`/`useCamera` 等 composables 可单测） |
+| 砍掉 | P0-2 安全基线、全部 P2 | —— | —— |
 
 **额外收获**：编写编排器测试时发现并修复一个真实 bug —— `answer()` 用**消息 id** 而非 `evidence_atom_ids` 过滤已问题目，消息表与原子表各自自增导致 id 撞车、候选被误排除（LLM 失败时回退会直接结束面试）。修复后测试全绿。
 
@@ -40,7 +43,7 @@
 
 ### 1.2 质量基线（较好）
 
-- 后端 12 个测试文件、112 项用例；前端 32 项用例，CI 已接入 GitHub Actions
+- 后端 19 个测试文件、221 项用例；前端 32 项用例，CI 已接入 GitHub Actions
 - 结构化请求日志、LLM 调用日志、异常日志完善
 - 登录/注册/面试等敏感接口已加 slowapi 限流
 - 爬虫合规：robots.txt 检查、UA 轮换、限速、单任务互斥
@@ -103,7 +106,7 @@
 
 ## 三、P1 · 中优先（性能 / 架构 / 测试）
 
-### P1-1 面试历史列表消除 N+1
+### P1-1 面试历史列表消除 N+1 ✅ 已完成
 
 **现状**：`interview.py:217-223` `list_interviews` 对每条记录调 `_make_out`（:46-74），内部再查 Position、Interviewer、Report、消息计数共 4 次；50 条即额外 200 次查询。
 
@@ -115,7 +118,7 @@
 
 **收益**：历史列表从 1+4N 次查询降到常数次，页面随数据量增长仍流畅。
 
-### P1-2 编排器消息查询复用
+### P1-2 编排器消息查询复用 ✅ 已完成
 
 **现状**：`interview_orchestrator.py` 的 `answer()` 内 `_messages()` 被调用 6 次以上（`_asked_rounds`、`_probe_streak`、`_avoid_streak`、`_history_text`、`asked_ids` 等），每次整表 SELECT。
 
@@ -123,7 +126,7 @@
 
 **收益**：每次作答从 6 次查询降到 1 次，SSE 响应延迟更低。
 
-### P1-3 岗位采集异步化
+### P1-3 岗位采集异步化 ✅ 已完成（降级方案 3）
 
 **现状**：`job_crawler.py:142-156` 同步 `httpx.Client` 请求 robots.txt；`:373-375` `_throttle`/`polite_sleep` 同步 `time.sleep(3~6s)`。`main.py:26-38` 的后台线程整个同步执行，单次同步可能阻塞数分钟，且无法优雅中断。
 
@@ -134,23 +137,22 @@
 
 **收益**：后台同步不占独立线程、可中断；爬虫运行时间更可控。
 
-### P1-4 前端巨型组件拆分
+### P1-4 前端巨型组件拆分 ✅ 已完成（Interview.vue）
 
 **现状**：`views/Interview.vue` 约 1776 行，混装向导、对话、打字机、语音识别、语音合成、摄像头采集、活动检测、SSE 管理、断线恢复等 8+ 类关注点；`views/JobMarket.vue` 约 1487 行。
 
 **方案**：
-1. `Interview.vue` 拆分：
-   - `components/interview/WizardStep.vue`：三步设置向导
-   - `components/interview/ChatPanel.vue`：消息列表 + 输入区 + 打字机
-   - `components/interview/VoiceBar.vue`：语音识别/合成控制条
+1. `Interview.vue` 拆分（实际落地）：
+   - `components/interview/InterviewWizard.vue` + `WizardStepper` + `StepPosition`/`StepInterviewer`/`StepSettings`：三步设置向导
+   - `components/interview/ChatPanel.vue`：消息列表 + 输入区 + 打字机 + 摄像头面板
    - `components/interview/CameraPanel.vue`：视频采集 + 活动检测
-   - `composables/useVoice.js`、`useCamera.js`、`useSSE.js`：能力抽离为可测试 hooks
-2. `JobMarket.vue` 拆分：`JobFilterBar`、`JobCardList`、`JobDetailDialog` 子组件。
+   - `composables/useVoice.js`、`useCamera.js`：语音/摄像头能力抽离（注入式依赖，可单测）
+2. `JobMarket.vue` 拆分：`JobFilterBar`、`JobCardList`、`JobDetailDialog` 子组件（未做，P2 视情况）。
 3. 拆分过程中用现有 `utils/typewriter.js` 模式，把纯逻辑抽到 utils/composables 便于单测。
 
 **收益**：可读性/可维护性大幅提升，多人协作冲突减少，逻辑可单测。
 
-### P1-5 补核心 service 单元测试
+### P1-5 补核心 service 单元测试 ✅ 已完成
 
 **现状**：测试覆盖集中在 `interview_agent`、`rag`、`job_crawler`、`question_import`、`real_interview_review`；**核心编排与报告逻辑零覆盖**：`interview_orchestrator.py`、`feedback.py`、`resume_matcher.py`、`salary_eval.py`、`offer_compare.py`、`study_plan.py`、`career_diagnosis.py`。
 
@@ -182,7 +184,7 @@
 | 阶段 | 周期 | 内容 | 验收标准 |
 | --- | --- | --- | --- |
 | 阶段一 | 1-2 天 | P0-1 ~ P0-4 | LLM 抖动下接口成功率上升；并发结束面试线程数有上限；start SSE 异常能收到 error 事件 |
-| 阶段二 | 2-3 天 | P1-1 ~ P1-5 | 历史列表 200+ 条毫秒级返回；`Interview.vue` 拆分后子组件 < 500 行；核心 service 测试补齐且 CI 通过 |
+| 阶段二 | 2-3 天 | P1-1 ~ P1-5 | ✅ 已完成：历史列表批量预取；`Interview.vue` 1776→534 行、子组件均 <500 行；核心 service 测试补齐（后端 221 项、前端 32 项全绿） |
 | 阶段三 | 持续迭代 | P2-1 ~ P2-7 | lint 无死代码告警；上传校验生效；搜索输入流畅 |
 
 ## 六、预期收益总结
