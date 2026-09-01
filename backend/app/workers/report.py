@@ -6,10 +6,7 @@ from app.core.db import SessionLocal
 from app.models.interview import Interview, InterviewMessage, Report
 from app.models.user import User
 from app.services.feedback import fallback_report, generate_report
-from app.services.interview_orchestrator import (
-    REPORT_PENDING_SUMMARY,
-    InterviewOrchestrator,
-)
+from app.services.interview_orchestrator import InterviewOrchestrator
 from app.services.llm_utils import get_llm_for_user
 
 logger = logging.getLogger(__name__)
@@ -25,8 +22,8 @@ def generate_report_task(interview_id: int) -> None:
         existing = (
             db.query(Report).filter(Report.interview_id == interview_id).first()
         )
-        # 报告已完整生成（总评非占位）则跳过；占位报告由本任务覆盖更新为真实内容
-        if existing is not None and existing.summary and existing.summary != REPORT_PENDING_SUMMARY:
+        # 报告已生成（AI 完整报告或已降级）则跳过；pending/failed 由本任务覆盖更新（failed 支持重试）
+        if existing is not None and existing.status in ("ready", "fallback"):
             return
         messages = list(
             db.query(InterviewMessage)
@@ -43,15 +40,22 @@ def generate_report_task(interview_id: int) -> None:
         )
         messages = messages[: last_answer + 1] if last_answer is not None else []
         llm = get_llm_for_user(db, interview.user_id)
+        used_fallback = False
         if llm is None:
+            logger.warning("未配置 LLM，使用规则降级报告: interview_id=%s", interview_id)
             data = fallback_report(messages)
+            used_fallback = True
         else:
             user = db.get(User, interview.user_id)
             if user is None:
                 return
             orchestrator = InterviewOrchestrator(db, user, interview, llm)
             try:
-                position_name = orchestrator.position.name if orchestrator.position else interview.target_position or "目标岗位"
+                position_name = (
+                    orchestrator.position.name
+                    if orchestrator.position
+                    else (interview.config or {}).get("target_position") or "目标岗位"
+                )
                 data = asyncio.run(
                     generate_report(
                         llm=llm,
@@ -64,6 +68,7 @@ def generate_report_task(interview_id: int) -> None:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("后台 LLM 报告失败，使用规则降级: %s", exc)
                 data = fallback_report(messages)
+                used_fallback = True
         report = existing or Report(interview_id=interview_id)
         if report not in db:
             db.add(report)
@@ -74,10 +79,23 @@ def generate_report_task(interview_id: int) -> None:
         report.summary = data.get("summary") or ""
         report.coverage = data.get("coverage", {"covered": [], "uncovered": []})
         report.learning_path = data.get("learning_path", [])
+        # 状态：LLM 全程可用 → ready；任意环节降级 → fallback（前端可提示并可重新生成）
+        report.status = "fallback" if used_fallback else "ready"
         interview.status = "reported"
         db.commit()
     except Exception:
         db.rollback()
         logger.exception("后台报告任务失败: interview_id=%s", interview_id)
+        # 报告失败显式标记 failed，前端可识别并触发重新生成
+        try:
+            report = (
+                db.query(Report).filter(Report.interview_id == interview_id).first()
+            )
+            if report is not None:
+                report.status = "failed"
+                db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("标记报告失败状态时出错: interview_id=%s", interview_id)
     finally:
         db.close()

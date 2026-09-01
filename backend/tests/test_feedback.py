@@ -43,7 +43,13 @@ VALID_PAYLOAD = {
     "overall_score": 82,
     "dimensions": {"tech": 85, "expression": 80, "logic": 78, "project": 86},
     "question_feedback": [
-        {"question": "自我介绍", "answer": "3 年后端", "score": 80, "comment": "清晰"},
+        {
+            "question": "自我介绍",
+            "answer": "3 年后端",
+            "score": 80,
+            "comment": "清晰",
+            "suggestion": "补充量化业绩，如日均订单量等。",
+        },
     ],
     "weak_points": ["缺少量化指标"],
     "coverage": {"covered": ["Redis"], "uncovered": ["MySQL 索引"]},
@@ -100,6 +106,7 @@ class TestGenerateReport:
         assert data["overall_score"] == 82.0
         assert data["dimensions"]["tech"] == 85.0
         assert data["question_feedback"][0]["score"] == 80.0
+        assert data["question_feedback"][0]["suggestion"] == "补充量化业绩，如日均订单量等。"
         assert data["learning_path"][0]["phase"] == "基础夯实"
         assert data["coverage"]["covered"] == ["Redis"]
 

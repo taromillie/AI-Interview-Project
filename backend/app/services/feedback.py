@@ -21,7 +21,7 @@ REPORT_PROMPT = """你是资深面试官兼职业顾问，请对下面这场模�
     "project": 0到100
   }},
   "question_feedback": [
-    {{"question": "题目", "answer": "候选回答(截断100字)", "score": 0到100, "comment": "点评"}}
+    {{"question": "题目", "answer": "候选回答(截断100字)", "score": 0到100, "comment": "点评", "suggestion": "该回答的优化建议(100字以内)"}}
   ],
   "weak_points": ["弱点1", "弱点2", ...],
   "coverage": {{
@@ -50,7 +50,8 @@ REPORT_PROMPT = """你是资深面试官兼职业顾问，请对下面这场模�
 规则：
 1. coverage 基于岗位技能清单判断：covered 为已考察且回答达标的技能，uncovered 为岗位要求但未考察或表现薄弱的技能；
 2. learning_path 3-5 个阶段，针对 weak_points 与 uncovered 给出可执行的学习路线；
-3. 只输出 JSON 对象，不要输出任何其他文字。
+3. suggestion 为该回答的具体优化建议，须可执行：指出回答的不足与具体改进方法，可给出示范话术或回答框架（如 STAR 法则、先结论后展开、补充量化数据），不要空泛评价；
+4. 只输出 JSON 对象，不要输出任何其他文字。
 """
 
 
@@ -124,6 +125,7 @@ async def generate_report(
                     "answer": str(item.get("answer", ""))[:150],
                     "score": _clamp(item.get("score")),
                     "comment": str(item.get("comment", ""))[:300],
+                    "suggestion": str(item.get("suggestion", ""))[:300],
                 }
             )
     weak_points = [str(w) for w in (data.get("weak_points") or []) if str(w).strip()][:6]
@@ -194,6 +196,7 @@ def fallback_report(messages: list[InterviewMessage]) -> dict:
                 "answer": m.content[:100],
                 "score": round(base, 1),
                 "comment": "LLM 复盘暂不可用，已按回答完整度粗略评分，请稍后重新生成。",
+                "suggestion": "AI 复盘暂不可用，建议补充量化指标与项目细节后重新生成，以获取逐题优化建议。",
             }
         )
     return {

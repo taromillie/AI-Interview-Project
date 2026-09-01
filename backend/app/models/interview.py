@@ -51,4 +51,6 @@ class Report(Base):
     summary: Mapped[str] = mapped_column(Text, default="")            # 总评与建议
     coverage: Mapped[dict] = mapped_column(JSON, default=dict)        # {covered:[], uncovered:[]}
     learning_path: Mapped[list] = mapped_column(JSON, default=list)   # [{phase,duration,action}]
+    # 报告生成状态：pending=后台生成中 / ready=AI 完整报告 / fallback=LLM 失败降级为规则报告 / failed=生成失败
+    status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -30,6 +30,52 @@
       <el-empty v-if="!loading && !report" description="暂无报告。完成一场模拟面试后，将在此展示复盘结果。" />
 
       <template v-if="report">
+        <!-- 报告状态提示：生成中 / AI 降级 / 生成失败 -->
+        <el-alert
+          v-if="isGenerating"
+          title="报告正在后台生成，页面将自动刷新，请稍候…"
+          type="info"
+          :closable="false"
+          show-icon
+          class="status-alert"
+        />
+        <div v-else-if="isFallback" class="status-alert">
+          <el-alert
+            title="本次报告由规则引擎生成（AI 分析暂不可用），内容可能不如 AI 报告细致。"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
+          <el-button :loading="regenerating" class="regenerate-btn" @click="regenerate">
+            <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>
+            重新生成
+          </el-button>
+        </div>
+        <div v-else-if="isFailed" class="status-alert">
+          <el-alert
+            title="报告生成失败，请点击下方按钮重新生成。"
+            type="error"
+            :closable="false"
+            show-icon
+          />
+          <el-button type="primary" :loading="regenerating" class="regenerate-btn" @click="regenerate">
+            <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>
+            重新生成
+          </el-button>
+        </div>
+        <div v-else-if="isReady" class="status-alert">
+          <el-alert
+            title="如需刷新逐题优化建议，可重新生成报告（将再次调用 AI 分析）。"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+          <el-button plain :loading="regenerating" class="regenerate-btn" @click="regenerate">
+            <el-icon style="margin-right: 4px"><RefreshRight /></el-icon>
+            重新生成
+          </el-button>
+        </div>
+
         <!-- 总分 + 四维度 -->
         <div class="overview">
           <el-progress
@@ -62,14 +108,7 @@
 
         <!-- 总评 -->
         <el-divider content-position="left">总评与建议</el-divider>
-        <el-alert
-          v-if="isGenerating"
-          title="报告正在后台生成，页面将自动刷新，请稍候…"
-          type="info"
-          :closable="false"
-          show-icon
-        />
-        <el-alert v-else :title="report.summary || '暂无总评'" type="info" :closable="false" />
+        <el-alert :title="report.summary || '暂无总评'" type="info" :closable="false" />
 
         <!-- 弱点 -->
         <template v-if="report.weak_points?.length">
@@ -164,6 +203,7 @@
             <div class="qf-body">
               <div class="qf-answer"><b>我的回答：</b>{{ qf.answer }}</div>
               <div class="qf-comment"><b>面试官点评：</b>{{ qf.comment }}</div>
+              <div v-if="qf.suggestion" class="qf-suggestion"><b>优化建议：</b>{{ qf.suggestion }}</div>
             </div>
           </el-collapse-item>
         </el-collapse>
@@ -173,22 +213,20 @@
 </template>
 
 <script setup>
-import { ArrowLeft, DataAnalysis, Notebook, Plus, Pointer } from '@element-plus/icons-vue'
+import { ArrowLeft, DataAnalysis, Notebook, Plus, Pointer, RefreshRight } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getReport } from '@/api/report'
+import { getReport, getReportStatus, regenerateReport } from '@/api/report'
 
 const route = useRoute()
 const router = useRouter()
 
 const DIMS = { tech: '技术能力', expression: '表达沟通', logic: '逻辑思维', project: '项目经验' }
 
-// 与后端 REPORT_PENDING_SUMMARY 保持一致：总评为此值表示报告仍在后台生成
-const PENDING_SUMMARY = '报告生成中，请稍后刷新查看…'
-
 const loading = ref(false)
 const report = ref(null)
+const regenerating = ref(false)
 let pollTimer = null
 // 轮询上限与退避：最多轮询 24 次（约 1 分钟）；连续失败时翻倍间隔，最多 20s
 const POLL_MAX_ATTEMPTS = 24
@@ -196,7 +234,11 @@ let pollAttempts = 0
 let pollFailures = 0
 let pollDelayMs = 2500
 
-const isGenerating = computed(() => report.value?.summary === PENDING_SUMMARY)
+// 报告状态由后端 report.status 驱动：pending=生成中 / ready=AI完整 / fallback=规则降级 / failed=失败可重试
+const isGenerating = computed(() => report.value?.status === 'pending')
+const isFallback = computed(() => report.value?.status === 'fallback')
+const isFailed = computed(() => report.value?.status === 'failed')
+const isReady = computed(() => report.value?.status === 'ready')
 
 function goPractice(knowledge) {
   router.push({ name: 'questions', query: { keyword: knowledge } })
@@ -230,8 +272,8 @@ async function load() {
   try {
     report.value = await getReport(id)
     // 报告仍在后台生成：轮询直到完成
-    if (report.value?.summary === PENDING_SUMMARY) {
-      startPolling(id)
+    if (report.value?.status === 'pending') {
+      startPolling(report.value.interview_id)
     }
   } catch {
     report.value = null
@@ -241,23 +283,31 @@ async function load() {
   }
 }
 
-function startPolling(id) {
-  if (pollTimer) return
+function startPolling(interviewId) {
+  if (!interviewId || pollTimer) return
   pollAttempts = 0
   pollFailures = 0
   pollDelayMs = 2500
-  pollTimer = setTimeout(async () => pollTick(id), pollDelayMs)
+  pollTimer = setTimeout(async () => pollTick(interviewId), pollDelayMs)
 }
 
-async function pollTick(id) {
+function stopPolling() {
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+async function pollTick(interviewId) {
   pollAttempts++
   try {
-    const r = await getReport(id)
+    // 轻量状态端点轮询，完成后再拉全量报告
+    const r = await getReportStatus(interviewId)
     pollFailures = 0
     pollDelayMs = 2500
-    if (r?.summary !== PENDING_SUMMARY) {
-      report.value = r
-      pollTimer = null
+    if (r?.status === 'reported' || r?.status === 'failed') {
+      stopPolling()
+      await load()
       return
     }
   } catch {
@@ -265,27 +315,38 @@ async function pollTick(id) {
     pollFailures++
     pollDelayMs = Math.min(pollDelayMs * 2, 20000)
     if (pollFailures >= 5) {
-      pollTimer = null
+      stopPolling()
       ElMessage.error('报告生成状态获取失败，请刷新页面重试')
       return
     }
   }
   if (pollAttempts >= POLL_MAX_ATTEMPTS) {
-    pollTimer = null
+    stopPolling()
     ElMessage.warning('报告仍在后台生成中，可稍后重进本页查看')
     return
   }
-  pollTimer = setTimeout(() => pollTick(id), pollDelayMs)
+  pollTimer = setTimeout(() => pollTick(interviewId), pollDelayMs)
+}
+
+// 重新生成报告：仅当 AI 降级（fallback）或生成失败（failed）时可用
+async function regenerate() {
+  const r = report.value
+  if (!r || regenerating.value) return
+  regenerating.value = true
+  try {
+    await regenerateReport(r.id)
+    report.value.status = 'pending'
+    startPolling(r.interview_id)
+  } catch {
+    /* 拦截器已统一提示 */
+  } finally {
+    regenerating.value = false
+  }
 }
 
 onMounted(load)
 
-onUnmounted(() => {
-  if (pollTimer) {
-    clearTimeout(pollTimer)
-    pollTimer = null
-  }
-})
+onUnmounted(stopPolling)
 </script>
 
 <style scoped>
@@ -394,6 +455,27 @@ onUnmounted(() => {
 }
 .qf-answer {
   margin-bottom: 8px;
+}
+.qf-suggestion {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(67, 217, 163, 0.08);
+  border: 1px solid rgba(67, 217, 163, 0.25);
+  color: var(--app-text-secondary);
+}
+
+.status-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.status-alert .el-alert {
+  flex: 1;
+}
+.regenerate-btn {
+  flex-shrink: 0;
 }
 
 /* ==================== 深色液态玻璃覆盖 ==================== */
