@@ -57,3 +57,10 @@ c931ba8045cc99fb14e26729656bd605.jpg
 
 # 本地开发一键启动脚本（仅本机使用）
 start_dev.py
+
+# 本地交付文档生成/检查脚本（引用本机路径，勿提交）
+fill_delivery_docs.py
+inspect_docs.py
+make_clean_docs.py
+repair_docs.py
+doc_inspection.txt
