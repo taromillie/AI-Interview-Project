@@ -77,4 +77,14 @@ def init_db() -> None:
             _ensure_column(conn, "reports", "summary", "summary TEXT NOT NULL DEFAULT ''")
             _ensure_column(conn, "reports", "coverage", "coverage JSON")
             _ensure_column(conn, "reports", "learning_path", "learning_path JSON")
+            # v1.5：报告显式状态（pending/ready/fallback/failed），取代"占位总评"隐式判断
+            _ensure_column(conn, "reports", "status", "status VARCHAR(20) NOT NULL DEFAULT 'pending'")
+            # 旧数据修复：已有真实总评的历史报告视为 ready；占位报告保留 pending 等待补生成
+            _pending_marker = "报告生成中，请稍后刷新查看…"
+            conn.execute(
+                text(
+                    "UPDATE reports SET status = 'ready' "
+                    "WHERE status = 'pending' AND summary IS NOT NULL AND summary != :marker"
+                ).bindparams(marker=_pending_marker)
+            )
             conn.commit()

@@ -23,19 +23,22 @@ setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 
-def _job_sync_loop() -> None:
-    """后台岗位同步线程：每 60 秒检查一次是否到达同步时间（间隔可动态调整）。"""
+def _job_sync_loop(stop_event: threading.Event) -> None:
+    """后台岗位同步线程：每 60 秒检查一次是否到达同步时间（间隔可动态调整）。
+
+    使用 stop_event.wait 代替 sleep，应用停机时可被优雅中断，
+    不会在请求已结束时继续占用数据库连接。
+    """
     from app.services.job_crawler import sync_jobs
     from app.services.sync_state import is_sync_due
 
-    while True:
+    while not stop_event.wait(60.0):
         try:
             if is_sync_due():
                 logger.info("定时岗位同步开始（动态间隔模式）")
                 sync_jobs()
         except Exception as exc:  # noqa: BLE001 采集失败只记录日志
             logger.warning("定时岗位同步失败: %s", exc)
-        time.sleep(60.0)
 
 
 @asynccontextmanager
@@ -43,11 +46,21 @@ async def lifespan(app: FastAPI):
     # 启动时初始化数据库表结构（开发用；生产走 Alembic）
     init_db()
     # 启动后台岗位同步线程
+    stop_event = threading.Event()
     if settings.JOB_SYNC_ON_STARTUP:
-        worker = threading.Thread(target=_job_sync_loop, daemon=True, name="job-sync")
+        worker = threading.Thread(
+            target=_job_sync_loop, args=(stop_event,), daemon=True, name="job-sync"
+        )
         worker.start()
         logger.info("岗位同步后台线程已启动（间隔可动态调整，初始 %.1f 小时）", settings.JOB_SYNC_INTERVAL_HOURS)
-    yield
+    try:
+        yield
+    finally:
+        # 优雅停机：最多等待 2 秒让同步线程退出当前周期
+        if settings.JOB_SYNC_ON_STARTUP:
+            stop_event.set()
+            worker.join(timeout=2)
+            logger.info("岗位同步后台线程已停止")
 
 
 app = FastAPI(
@@ -105,9 +118,15 @@ async def request_logging(request: Request, call_next):
 app.add_middleware(SlowAPIMiddleware)
 
 
+@app.get("/health/live", tags=["system"])
+def health_live() -> dict:
+    """存活检查：进程在即通过，不探测依赖，供容器 liveness 使用。"""
+    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+
+
 @app.get("/health", tags=["system"])
 def health() -> dict:
-    """健康检查：包含数据库连通性探测。"""
+    """就绪检查：包含数据库连通性探测，供容器 readiness 与部署验证使用。"""
     db_ok = True
     try:
         with SessionLocal() as db:
